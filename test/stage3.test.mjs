@@ -160,11 +160,11 @@ test('expired, foreign issuer and wrong audience signed tokens are rejected', as
   }
   assert.equal(db.calls(), 0);
 });
-test('deployment identity remains schema v1 and records stage 4', () => {
+test('deployment identity remains schema v1 and records stage 5', () => {
   const result = deploymentIdentity({ VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'jennajiminkim',
     VERCEL_GIT_REPO_SLUG: 'choi-bujang-secret-vault', VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40),
     VERCEL_URL: 'choi-bujang-secret-vault-tawny.vercel.app' }, config);
-  assert.equal(result.step, 4); assert.equal(result.schema, 'aleph.defense.deployment.v1');
+  assert.equal(result.step, 5); assert.equal(result.schema, 'aleph.defense.deployment.v1');
 });
 
 test('normal Supabase student claims go through the unchanged verification helper', async () => {
