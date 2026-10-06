@@ -1,25 +1,64 @@
-# BYTE BACK 방어전 시작 틀 R5
+# BYTE BACK 방어전 · 2단계 저장점
 
-이 저장소는 1단계에서 학생 본인이 GitHub 저장소와 Vercel 배포를 만드는 출발점입니다. 포함된 메모 네 건은 가상 자료입니다. 실제 학생 자료, 토큰, 비밀키를 넣지 마세요.
+이 저장소는 2단계 **「자료를 코드 밖으로 옮깁니다」** 상태입니다. 가상 메모 네 건은 정적 `data.json`에서 제거하고, Vercel 서버 함수 `/api/notes`가 학습용 Supabase 테이블에서 읽도록 바꿉니다. 실제 개인정보·비밀번호·토큰·서버 전용 키는 코드나 Git에 넣지 않습니다.
 
-## 학생이 하는 일: 세 걸음
+## 현재 작동하는 기능
 
-1. GitHub 계정을 만듭니다.
-2. 방어전 1단계 카드의 **Deploy** 버튼을 누릅니다. Vercel에 GitHub로 로그인하고, 새 저장소가 **본인 계정의 Public 저장소**인지 확인한 뒤 Deploy를 누릅니다.
-3. 배포가 끝나면 화면에 나온 `https://…vercel.app` 주소를 방어전 1단계 카드에 붙여넣고 제출합니다. 저장소 주소나 설정 파일은 적지 않습니다.
+- `/` 화면은 `/api/notes`를 호출해 가상 메모 카드를 표시합니다.
+- `/data.json`은 메모 0건만 포함합니다.
+- `api/notes.js`는 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`를 서버 환경변수에서만 읽습니다.
+- Supabase `notes` 테이블은 `owner_id uuid` 칸을 가지며 RLS가 활성화되고 `anon`, `authenticated`에는 직접 테이블 권한을 주지 않습니다.
+- 빌드 시 `public/aleph.json`은 계속 생성합니다.
 
-배포가 끝나면 `/`에서 점령된 가상 자료실을 볼 수 있습니다. `/data.json`에는 같은 가상 메모가 공개됩니다. 이 공개 상태를 확인하는 것이 1단계의 출발점입니다. 1단계 접수와 심판 판정은 포털에서 확인합니다.
+## 2단계 설정
 
-## 시작 틀의 자동 처리
+1. Supabase SQL Editor에서 `supabase/step2_notes.sql`을 실행합니다.
+2. Table Editor에서 `notes.owner_id`가 `uuid`인지 확인하고 RLS가 켜져 있는지 확인합니다.
+3. Vercel 프로젝트의 Environment Variables에 `SUPABASE_URL`과 `SUPABASE_SECRET_KEY`를 추가합니다. 값 자체는 코드, Git, 로그, 화면에 복사하지 않습니다.
+4. 새 배포 뒤 `/`에서 네 카드가 보이는지 확인합니다.
+5. `/data.json`을 직접 열어 `notes`가 빈 배열인지 확인합니다.
 
-`vercel.json`은 정적 결과물 `public`을 배포합니다. 빌드 명령 `npm run build`는 Vercel이 제공하는 GitHub 저장소 소유자·이름, 커밋 SHA, 배포 URL을 검증하고 `public/aleph.json`을 생성합니다. 이 값이 없으면 빌드가 실패하므로, 성공한 것처럼 빈 주소를 내보내지 않습니다. `aleph.json`의 내용만으로 저장소 소유권이나 방어 성공을 인정하지 않습니다. 심판이 공개 저장소의 실제 커밋과 배포된 자료를 따로 대조해야 합니다.
+로컬 정적 빌드는 `npm run build -- --local`로 확인할 수 있습니다. 이 명령은 Supabase 서버 함수 동작이나 Vercel 배포 성공을 증명하지 않습니다.
 
-`aleph.config.json`의 `repoUrl`과 `publicAppUrl`은 이전 제출 묶음 방식의 자리표시자입니다. 1단계에서는 학생이 편집하지 않습니다. 2단계 이후 코딩 도구가 필요한 설정과 보호 기능을 단계별로 작성합니다. `npm run bundle`과 `bundle-notes.json`도 1단계의 세 걸음에는 포함되지 않습니다.
+## 남아 있는 약점
 
-로컬에서 가상 화면만 확인할 때는 `npm run build -- --local`을 사용합니다. 로컬 실행은 Vercel 배포나 심판 접수를 증명하지 않습니다. 저장소의 `src/attack-check.mjs`는 실제 배포가 된 뒤 `/data.json`을 비로그인으로 요청해 공개 가상 메모의 확인 표시를 읽습니다.
+2단계에서는 비밀키를 브라우저 번들과 공개 저장소에서 제거했지만, `/api/notes` 자체는 아직 로그인 없이 누구나 호출할 수 있는 공개 주소입니다. 따라서 이 단계에서는 실제 자료가 아니라 가상 메모만 유지합니다. 접근 통제는 다음 단계에서 추가해야 합니다.
 
-## 다음 단계의 코딩 도구에 전달할 규칙
+또한 최신 파일에서 메모를 제거해도 **이전에 공개된 Git 커밋과 이미 생성된 옛 배포 이력까지 자동으로 지워지는 것은 아닙니다.** 과거에 공개된 값은 노출 이력이 남아 있는 것으로 취급해야 하며, 최신 버전만 정리한 것을 과거 노출 해소라고 표현하지 않습니다.
 
-[AGENTS.md](AGENTS.md)를 먼저 읽히고 한 번에 한 제작 단위만 요청하세요. 2단계부터는 자료 보호를 구현할 때 `public/data.json`을 복사하는 1단계 빌드 흐름도 함께 바꿔야 합니다. 3단계 이후의 로그인, 허용 경로, 5단계의 원본 API 주소, 6단계 이후 정책 규칙은 해당 단계 원고와 계약에 맞춰 추가합니다. 비밀번호·토큰·서버 전용 키·실제 학생 기록을 코드, Git, 제출 묶음에 넣지 않습니다.
+## 최신 파일 확인 절차
 
-`src/decider.mjs`와 `src/detect.mjs`의 로컬 시험은 반 엔진이나 운영 심판의 결과가 아닙니다. 1단계 이후 제출 묶음 계약 `aleph.defense.submission.v2`는 `scripts/bundle.mjs`에 남아 있으며, 코딩 도구가 해당 단계의 최신 배포 주소와 Git 원격을 맞춘 뒤 사용합니다.
+아래 확인은 **현재 배포 파일과 GitHub 최신 버전**을 대상으로 합니다.
+
+```bash
+# 현재 작업 트리의 정적 파일에서 가상 메모 문장 검색
+grep -R -n -E '실습용 가상 (과제|포트폴리오|리추얼|행정) 기록' data.json public scripts api || true
+
+# GitHub 최신 추적 파일에서 같은 문장 검색
+git grep -n -E '실습용 가상 (과제|포트폴리오|리추얼|행정) 기록' -- ':!supabase/step2_notes.sql' || true
+```
+
+정상 결과는 정적 `data.json`, `public`, 브라우저 코드에 가상 메모 본문이 나타나지 않는 것입니다. `supabase/step2_notes.sql`에는 학습용 DB로 옮길 초기 가상 데이터가 의도적으로 존재하므로 최신 **정적 공개 파일 검사에서는 제외**합니다.
+
+배포 확인:
+
+```bash
+curl -i https://choi-bujang-secret-vault-tawny.vercel.app/data.json
+curl -i https://choi-bujang-secret-vault-tawny.vercel.app/api/notes
+curl -i https://choi-bujang-secret-vault-tawny.vercel.app/aleph.json
+```
+
+- `/data.json`: `notes`가 0건이어야 합니다.
+- `/api/notes`: 현재 2단계에서는 비로그인 호출도 성공할 수 있습니다. 이것이 남은 약점입니다.
+- `/aleph.json`: 최신 빌드에서 계속 열려야 합니다.
+
+## 저장소 및 배포
+
+- 저장소: https://github.com/jennajiminkim/choi-bujang-secret-vault
+- 배포: https://choi-bujang-secret-vault-tawny.vercel.app
+
+`aleph.config.json`의 `step`은 2이고, 로그인 발급자·허용 경로·원본 API 주소는 아직 다음 단계용이라 설정하지 않습니다. `judgeIssuer`는 운영 측이 제공한 값을 그대로 유지합니다.
+
+## 주의
+
+`npm run bundle`은 학생 자기 점검용 제출 묶음을 만듭니다. 로컬 명령이나 자체 점검을 심판 판정으로 표현하지 않습니다. `bundle-notes.json`과 `artifacts/submission.json`은 커밋하지 않습니다.
