@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { build } from 'esbuild';
 import { deploymentIdentity } from './deployment-identity.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const config = JSON.parse(await readFile(resolve(root, 'aleph.config.json'), 'utf8'));
-if (config.step !== 2) {
-  throw new Error('현재 빌드는 2단계 보호 흐름을 기대합니다. aleph.config.json의 step을 확인하세요.');
+if (config.step !== 3) {
+  throw new Error('현재 빌드는 3단계 인증 흐름을 기대합니다. aleph.config.json의 step을 확인하세요.');
 }
 
 await mkdir(resolve(root, 'public'), { recursive: true });
@@ -25,3 +26,6 @@ if (!process.argv.includes('--local')) {
   );
   console.log('배포 저장소·커밋·주소를 public/aleph.json에 기록했습니다.');
 }
+
+await build({ entryPoints: [resolve(root, 'src/browser-app.mjs')], outfile: resolve(root, 'public/assets/app.js'), bundle: true, format: 'esm', platform: 'browser', target: 'es2022', minify: true, legalComments: 'none' });
+console.log('공식 Supabase SDK와 로그인 화면 코드를 빌드했습니다.');

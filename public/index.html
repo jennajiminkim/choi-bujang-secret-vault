@@ -3,50 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 자료를 코드 밖으로</title>
+  <title>BYTE BACK | 진짜 로그인을 붙입니다</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; } [hidden] { display: none !important; }
     body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
     main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
     .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
     h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
     p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
-    .notice { margin: 26px 0; padding: 18px; border: 1px solid #d0a873; border-radius: 14px; color: #fff0d8; background: #614b2a44; }
+    .notice { margin: 26px 0; padding: 18px; border: 1px solid #d0a873; border-radius: 14px; color: #fff0d8; background: #614b2a44; line-height: 1.6; }
+    section, li { border: 1px solid #51667c; border-radius: 14px; padding: 20px; background: #1a2a3d; }
+    section { margin-top: 20px; } h2 { margin-top: 0; font-size: 22px; }
+    label { display: block; margin: 14px 0 6px; }
+    input, textarea { width: 100%; border: 1px solid #64819c; border-radius: 8px; padding: 12px; background: #101a28; color: #ecf4ff; font: inherit; }
+    textarea { resize: vertical; min-height: 140px; }
+    button { margin-top: 14px; padding: 10px 16px; border: 1px solid #8ad8df; border-radius: 8px; background: #8ad8df; color: #101a28; font: inherit; font-weight: 600; cursor: pointer; }
+    button.secondary { background: transparent; color: #ecf4ff; } button.danger { border-color: #f6a6a6; color: #f6a6a6; background: transparent; }
+    button:disabled { opacity: .5; cursor: wait; } :focus-visible { outline: 3px solid #f7cc82; outline-offset: 3px; }
     ul { list-style: none; display: grid; gap: 12px; padding: 0; }
-    li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
-    strong { display: block; font-size: 18px; margin-bottom: 5px; }
-    li span { color: #bfd0e5; }
+    strong { display: block; font-size: 18px; margin-bottom: 5px; overflow-wrap: anywhere; }
+    li span { color: #bfd0e5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; } #message { min-height: 28px; color: #fff0d8; }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 2단계 자료 분리</div>
-    <h1>자료를 코드 밖으로 옮깁니다</h1>
-    <p>가상 메모는 정적 파일이 아니라 서버 함수가 학습용 데이터베이스에서 읽습니다.</p>
-    <div class="notice">정적 파일에서 메모를 제거했지만, 이 단계의 <code>/api/notes</code> 주소는 아직 누구나 호출할 수 있습니다. 다음 단계에서 접근 통제를 추가해야 합니다.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    <div class="eyebrow">BYTE BACK · 3단계 로그인</div>
+    <h1>진짜 로그인을 붙입니다</h1>
+    <p>로그인한 계정으로 가상 메모를 추가하고, 수정하고, 삭제하세요.</p>
+    <div class="notice">학습용 가상 메모만 입력하세요. 로그인은 신원 확인입니다. 다른 계정의 메모 ID를 알면 접근할 수 있는 허점은 4단계에서 막습니다.</div>
+    <p id="auth-status" role="status">로그인 상태를 확인하는 중입니다.</p>
+    <p id="message" role="status" aria-live="polite"></p>
+    <section id="login-panel">
+      <h2>이메일 로그인</h2>
+      <form id="login-form">
+        <label for="email">이메일</label><input id="email" type="email" autocomplete="username" required>
+        <label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" required>
+        <button id="login-button" disabled>로그인</button>
+      </form>
+      <p>Supabase Auth에 등록된 실습 계정으로 로그인하세요.</p>
+    </section>
+    <div id="workspace" hidden>
+      <button id="logout-button" class="secondary">로그아웃</button>
+      <section>
+        <h2 id="editor-heading">새 가상 메모</h2>
+        <form id="note-form">
+          <label for="title">제목</label><input id="title" maxlength="200" required>
+          <label for="body">본문</label><textarea id="body" maxlength="10000"></textarea>
+          <div class="actions"><button id="save-button">메모 추가</button><button id="cancel-button" type="button" class="secondary" hidden>수정 취소</button></div>
+        </form>
+      </section>
+      <section><h2>내 가상 메모</h2><button id="refresh-button" class="secondary">새로고침</button><ul id="notes" aria-live="polite"></ul></section>
+    </div>
   </main>
-  <script type="module">
-    const list = document.querySelector('#notes');
-    try {
-      const response = await fetch('/api/notes', { cache: 'no-store' });
-      if (!response.ok) throw new Error('서버 자료를 읽을 수 없습니다.');
-      const data = await response.json();
-      if (!Array.isArray(data.notes)) throw new Error('자료 형식이 맞지 않습니다.');
-      list.replaceChildren(...data.notes.map(note => {
-        const item = document.createElement('li');
-        const title = document.createElement('strong');
-        const content = document.createElement('span');
-        title.textContent = note.title;
-        content.textContent = note.content;
-        item.append(title, content);
-        return item;
-      }));
-    } catch (error) {
-      const item = document.createElement('li');
-      item.textContent = error.message;
-      list.replaceChildren(item);
-    }
-  </script>
+  <script type="module" src="/assets/app.js"></script>
 </body>
 </html>
