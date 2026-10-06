@@ -11,7 +11,8 @@
     "detect:test": "node scripts/detect-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
-    "test:stage3": "node --test test/stage3.test.mjs"
+    "test:stage3": "node --test test/stage3.test.mjs",
+    "test:stage4": "node --test test/stage3.test.mjs test/stage4-rls.test.mjs test/r5.test.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -21,6 +22,7 @@
     "jose": "6.2.12"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "esbuild": "^0.25.12"
   }
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from './verify-login.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-const fields = 'id,title,content';
+const fields = 'id,title,content,owner_id';
 const noteJson = note => ({ id: note.id, title: note.title, body: note.content });
 
 export function createNotesHandler({ config, supabase, judgeKeySet }) {
@@ -28,14 +28,15 @@ export function createNotesHandler({ config, supabase, judgeKeySet }) {
         return res.status(200).json((data ?? []).map(noteJson));
       }
       if (req.method === 'GET') {
-        // Stage 3 checks identity only. Per-note ownership is stage 4.
-        const { data, error } = await supabase.from('notes').select(fields).eq('id', id).maybeSingle();
+        // Match ownership in the same statement that reads the row.
+        const { data, error } = await supabase.from('notes').select(fields)
+          .eq('id', id).eq('owner_id', user.userId).maybeSingle();
         if (error) return res.status(502).json({ error: '메모를 읽을 수 없습니다.' });
         if (!data) return res.status(404).json({ error: '메모를 찾을 수 없습니다.' });
         return res.status(200).json(noteJson(data));
       }
       if (req.method === 'DELETE') {
-        const { data, error } = await supabase.from('notes').delete().eq('id', id).select('id').maybeSingle();
+        const { data, error } = await supabase.from('notes').delete().eq('id', id).eq('owner_id', user.userId).select('id').maybeSingle();
         if (error) return res.status(502).json({ error: '메모를 삭제할 수 없습니다.' });
         if (!data) return res.status(404).json({ error: '메모를 찾을 수 없습니다.' });
         return res.status(200).json({ id: data.id });
@@ -59,8 +60,17 @@ export function createNotesHandler({ config, supabase, judgeKeySet }) {
         if (error) return res.status(502).json({ error: '메모를 추가할 수 없습니다. DB 이전 SQL 실행 여부를 확인해 주세요.' });
         return res.status(201).json({ id: data.id });
       }
+      if (Object.hasOwn(body, 'owner_id')) {
+        return res.status(403).json({ error: '메모 소유자는 변경할 수 없습니다.' });
+      }
+      if (Object.keys(body).some(key => !['title', 'body'].includes(key))) {
+        return res.status(400).json({ error: '수정 요청에는 title과 body만 포함해 주세요.' });
+      }
+      // Filter the existing owner and fix the new owner to the verified identity.
+      // This is one DB statement, so an ownership change cannot race a prior check.
       const { data, error } = await supabase.from('notes')
-        .update({ title: body.title.trim(), content: body.body }).eq('id', id).select(fields).maybeSingle();
+        .update({ title: body.title.trim(), content: body.body, owner_id: user.userId })
+        .eq('id', id).eq('owner_id', user.userId).select(fields).maybeSingle();
       if (error) return res.status(502).json({ error: '메모를 수정할 수 없습니다.' });
       if (!data) return res.status(404).json({ error: '메모를 찾을 수 없습니다.' });
       return res.status(200).json(noteJson(data));

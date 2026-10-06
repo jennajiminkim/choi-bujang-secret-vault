@@ -22,9 +22,9 @@ function database() {
   const client = { auth: { getClaims: async () => ({ data: null, error: new Error('reject') }) },
     from() {
       calls++;
-      let action = 'read', payload, filter;
+      let action = 'read', payload; const filters = [];
       const q = {
-        select() { return q; }, eq(key, value) { filter = [key, value]; return q; },
+        select() { return q; }, eq(key, value) { filters.push([key, value]); return q; },
         insert(value) { action = 'insert'; payload = value; return q; },
         update(value) { action = 'update'; payload = value; return q; },
         delete() { action = 'delete'; return q; },
@@ -37,7 +37,7 @@ function database() {
           if (rows.has(payload.id)) return { data: null, error: { code: '23505' } };
           rows.set(payload.id, { ...payload }); return { data: { ...payload }, error: null };
         }
-        let found = [...rows.values()].filter(row => !filter || row[filter[0]] === filter[1]);
+        let found = [...rows.values()].filter(row => filters.every(([key, value]) => row[key] === value));
         if (action === 'update') found.forEach(row => Object.assign(row, payload));
         if (action === 'delete') found.forEach(row => rows.delete(row.id));
         return { data: single ? found[0] ?? null : found, error: null };
@@ -83,7 +83,7 @@ test('A creates, reads, updates, deletes UUID notes; deleted GET returns 404', a
   assert.match(id, /^[a-f0-9-]{36}$/); assert.equal(db.rows.get(id).owner_id, A);
   assert.deepEqual((await request('GET', id)).body, { id, title: 'fixture', body: 'fixture' });
   assert.equal((await request('GET')).body.length, 1);
-  assert.equal((await request('PUT', id, { title: 'edited', body: 'edited', owner_id: B })).code, 200);
+  assert.equal((await request('PUT', id, { title: 'edited', body: 'edited' })).code, 200);
   assert.equal(db.rows.get(id).owner_id, A);
   assert.equal((await request('DELETE', id)).code, 200);
   assert.equal((await request('GET', id)).code, 404);
@@ -97,14 +97,57 @@ test('supplied UUID, duplicate IDs, invalid IDs and payloads follow API contract
   assert.equal((await request('PUT', run, { title: '', body: 'fixture' })).code, 400);
   assert.equal((await request('POST', undefined, '{')).code, 400);
 });
-test('B sees only own list but can access/edit A by ID: intentional stage 4 gap', async () => {
-  const { request } = setup();
-  const created = await request('POST', undefined, { title: 'fixture', body: 'fixture' });
-  const id = created.body.id;
-  assert.deepEqual((await request('GET', undefined, undefined, authB)).body, []);
-  assert.equal((await request('GET', id, undefined, authB)).code, 200);
-  assert.equal((await request('PUT', id, { title: 'changed', body: 'fixture' }, authB)).code, 200);
-  assert.equal((await request('DELETE', id, undefined, authB)).code, 200);
+test('A and B keep their own CRUD while every cross-owner operation is denied', async () => {
+  const { request, db } = setup();
+  const a = (await request('POST', undefined, { title: 'A fixture', body: 'fixture' })).body.id;
+  const b = (await request('POST', undefined, { title: 'B fixture', body: 'fixture' }, authB)).body.id;
+  for (const [ownId, otherId, auth] of [[a, b, authA], [b, a, authB]]) {
+    const list = await request('GET', undefined, undefined, auth);
+    assert.deepEqual(list.body.map(note => note.id), [ownId]);
+    assert.equal((await request('GET', ownId, undefined, auth)).code, 200);
+    assert.equal((await request('GET', otherId, undefined, auth)).code, 404);
+    assert.equal((await request('PUT', otherId, { title: 'blocked', body: 'blocked' }, auth)).code, 404);
+    assert.equal((await request('DELETE', otherId, undefined, auth)).code, 404);
+    assert.equal((await request('PUT', ownId, { title: 'edited', body: 'edited' }, auth)).code, 200);
+  }
+  assert.equal(db.rows.get(a).owner_id, A); assert.equal(db.rows.get(b).owner_id, B);
+  for (const [id, auth] of [[a, authA], [b, authB]]) {
+    assert.equal((await request('DELETE', id, undefined, auth)).code, 200);
+    assert.equal((await request('GET', id, undefined, auth)).code, 404);
+  }
+});
+test('owner changes are rejected and rejected updates leave original data intact', async () => {
+  const { request, db } = setup();
+  const id = (await request('POST', undefined, { title: 'fixture', body: 'fixture', owner_id: B, userId: B, role: 'admin' })).body.id;
+  assert.equal(db.rows.get(id).owner_id, A);
+  assert.equal((await request('PUT', id, { title: 'blocked', body: 'blocked', owner_id: B })).code, 403);
+  assert.equal((await request('PUT', id, { title: 'blocked', body: 'blocked', owner_id: A })).code, 403);
+  assert.equal((await request('PUT', id, { title: 'blocked', body: 'blocked', userId: B, role: 'admin' })).code, 400);
+  assert.equal(db.rows.get(id).title, 'fixture'); assert.equal(db.rows.get(id).owner_id, A);
+});
+test('URL owner spoofing cannot grant cross-owner read, update or delete', async () => {
+  const db = database();
+  const handler = createNotesHandler({ config, supabase: db.client, judgeKeySet: async () => publicKey });
+  db.rows.set(run, { id: run, owner_id: A, title: 'fixture', content: 'fixture' });
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const res = response();
+    await handler({ method, headers: { authorization: `Bearer ${authB}` }, query: { id: run, owner_id: A, userId: A, role: 'admin' }, body: { title: 'blocked', body: 'blocked' } }, res);
+    assert.equal(res.code, 404); assert.deepEqual(Object.keys(res.body), ['error']);
+  }
+  assert.equal(db.rows.get(run).owner_id, A); assert.equal(db.rows.get(run).title, 'fixture');
+});
+test('unassigned rows are denied and a reused ID cannot overwrite another owner', async () => {
+  const { db, request } = setup();
+  db.rows.set(run, { id: run, owner_id: null, title: 'fixture', content: 'fixture' });
+  for (const auth of [authA, authB]) {
+    assert.deepEqual((await request('GET', undefined, undefined, auth)).body, []);
+    assert.equal((await request('GET', run, undefined, auth)).code, 404);
+    assert.equal((await request('PUT', run, { title: 'blocked', body: 'blocked' }, auth)).code, 404);
+    assert.equal((await request('DELETE', run, undefined, auth)).code, 404);
+  }
+  db.rows.get(run).owner_id = A;
+  assert.equal((await request('POST', undefined, { id: run, title: 'blocked', body: 'blocked' }, authB)).code, 409);
+  assert.equal(db.rows.get(run).owner_id, A); assert.equal(db.rows.get(run).title, 'fixture');
 });
 test('expired, foreign issuer and wrong audience signed tokens are rejected', async () => {
   const { request, db } = setup();
@@ -117,11 +160,11 @@ test('expired, foreign issuer and wrong audience signed tokens are rejected', as
   }
   assert.equal(db.calls(), 0);
 });
-test('deployment identity remains schema v1 and records stage 3', () => {
+test('deployment identity remains schema v1 and records stage 4', () => {
   const result = deploymentIdentity({ VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'jennajiminkim',
     VERCEL_GIT_REPO_SLUG: 'choi-bujang-secret-vault', VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40),
     VERCEL_URL: 'choi-bujang-secret-vault-tawny.vercel.app' }, config);
-  assert.equal(result.step, 3); assert.equal(result.schema, 'aleph.defense.deployment.v1');
+  assert.equal(result.step, 4); assert.equal(result.schema, 'aleph.defense.deployment.v1');
 });
 
 test('normal Supabase student claims go through the unchanged verification helper', async () => {
