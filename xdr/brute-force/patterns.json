@@ -1,0 +1,16 @@
+[
+  {
+    "name": "반복 비밀번호 추측",
+    "condition": "T1110 계열 로그인 실패 또는 비밀번호 추측 경보. 수준 10 이상이며 40건 이상이거나, 5분 이내 20건 이상이거나, 다수 계정을 규칙적으로 또는 이름을 바꿔 시도한 20건 이상이면 명확한 후보. 긴 시간대·상충 신호는 알림으로 낮춤.",
+    "evidence": "MITRE ATT&CK T1110.001은 반복적·순차적 비밀번호 추측과 같은 계정 또는 여러 계정의 인증 실패 상관분석을 설명한다.",
+    "source": "https://attack.mitre.org/techniques/T1110/001/",
+    "thresholds": { "highLevel": 10, "highCount": 40, "burstCount": 20, "windowSeconds": 300, "alertCount": 3 }
+  },
+  {
+    "name": "여러 계정 비밀번호 스프레이",
+    "condition": "같은 비밀번호를 여러 계정에 대입했다는 경보 요약이 있고 T1110 계열·수준 10 이상이며 대상 계정이 5개 이상이면 명확한 후보. 비밀번호 원문은 읽거나 비교하지 않음.",
+    "evidence": "MITRE ATT&CK T1110.003은 하나 또는 소수의 비밀번호를 여러 계정에 시도하는 Password Spraying을 설명한다.",
+    "source": "https://attack.mitre.org/techniques/T1110/003/",
+    "thresholds": { "highLevel": 10, "minAccounts": 5 }
+  }
+]

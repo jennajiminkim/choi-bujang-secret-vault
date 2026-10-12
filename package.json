@@ -11,6 +11,8 @@
     "detect:test": "node scripts/detect-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
+    "xdr:respond": "node xdr/brute-force/respond.mjs --replay",
+    "test:xdr": "node --test test/xdr-run.test.mjs test/brute-force.test.mjs",
     "test:stage3": "node --test test/stage3.test.mjs",
     "test:stage4": "node --test test/stage3.test.mjs test/stage4-rls.test.mjs test/r5.test.mjs",
     "test:stage5": "node --test test/stage3.test.mjs test/stage4-rls.test.mjs test/stage5-grants.test.mjs test/r5.test.mjs"

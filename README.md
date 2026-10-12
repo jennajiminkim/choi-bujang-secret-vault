@@ -83,3 +83,17 @@ HTTP 자기 점검은 실제 보낸 응답만 기록합니다. 실제 A/B 시험
 
 설계 참고: https://supabase.com/docs/guides/api/securing-your-api
 권한 회수 참고: https://www.postgresql.org/docs/current/sql-revoke.html
+
+## 보너스 xdr-01 저장점 · 무차별 로그인 공격
+
+5단계 앱·DB·설정과 기존 ZTNA 규칙은 보존합니다. `xdr/brute-force/`에 비밀값을 가리는 경보 읽기, MITRE T1110 패턴 목록, 독립 판단 모듈, 만료 15분의 추가 IP 거부 규칙·알림 연결 어댑터를 만들었습니다. 상세 설정과 한계는 [`xdr/brute-force/README.md`](xdr/brute-force/README.md)에 있습니다.
+
+```bash
+npm run xdr:run -- brute-force
+npm run xdr:respond
+npm run test:xdr
+```
+
+로컬 확인: 경보 28건/읽기 28줄, **block 10·alert 9·record 9**, 정상 연습 이벤트 9건의 block **0건**, 테스트 **8개 통과**입니다. `xdr:run`은 result.json만 갱신하고 `xdr:respond`는 별도 시험 시계로 차단·알림을 재생합니다. 시험 규칙은 실제 규칙과 분리하고 로그 및 런타임 규칙 파일은 커밋하지 않습니다.
+
+기존 판정기는 모든 요청을 거부하는 시작점 그대로입니다. 추가 차단 어댑터의 정상 통과는 로컬 시험 정책으로 검증했습니다. 현재 엔진 계약에는 출발 IP가 없으므로, 신뢰된 서버 주소 전달·거부 사유 등록·엔진 진입점 연결은 아직 미완료이며 실제 운영 차단이나 심판 통과로 보고하지 않습니다. 저장점 메시지는 **보너스 xdr-01 저장점**입니다.
