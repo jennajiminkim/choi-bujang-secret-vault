@@ -1,0 +1,69 @@
+[
+  {
+    "name": "SQL 주입 형태",
+    "condition": "요청 인자의 이어 붙인 SQL, UNION SELECT 또는 SELECT ... FROM 형태나 경보의 SQL 주입 요약. 확인된 같은 출발 주소의 집계 건수 5 이상, 수준 10 이상, T1190 경보에서 명확한 형태이면 차단 후보. 단일·수업명·부정 설명은 알림으로만 처리.",
+    "evidence": "MITRE ATT&CK T1190은 외부 공개 앱을 통한 SQL 주입 악용 사례를 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "minRepeat": 5,
+      "alertLevel": 5
+    }
+  },
+  {
+    "name": "스크립트 주입 형태",
+    "condition": "요청 인자의 script 태그, 이벤트 처리 속성 또는 경보의 스크립트 삽입 요약. 확인된 같은 출발 주소의 집계 건수 5 이상, 수준 10 이상, T1190 경보에서 명확한 형태이면 차단 후보. 단일·수업명·부정 설명은 알림으로만 처리.",
+    "evidence": "MITRE T1190의 외부 공개 앱 악용 범위에서 CWE-79는 입력에 섞인 클라이언트 스크립트의 실행 위험을 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/",
+      "https://cwe.mitre.org/data/definitions/79.html"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "minRepeat": 5,
+      "alertLevel": 5
+    }
+  },
+  {
+    "name": "경로 이탈 형태",
+    "condition": "요청 인자의 ../ 또는 ..\\ 표기와 경보의 다단계 경로 이탈 요약. 확인된 같은 출발 주소의 집계 건수 5 이상, 수준 10 이상, T1190 경보에서 명확한 형태이면 차단 후보. 단일·수업명·부정 설명은 알림으로만 처리.",
+    "evidence": "MITRE ATT&CK T1190은 directory traversal 취약점을 악용한 외부 공개 앱 침투 사례를 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "minRepeat": 5,
+      "alertLevel": 5
+    }
+  },
+  {
+    "name": "명령 주입 형태",
+    "condition": "경보에 명령 구분자의 연속 요청 요약이 있으면 확인. 요청 인자의 구분자 하나만으로는 차단하지 않음. 확인된 같은 출발 주소의 집계 건수 5 이상, 수준 10 이상, T1190 경보에서 명확한 형태이면 차단 후보. 단일·수업명·부정 설명은 알림으로만 처리.",
+    "evidence": "MITRE T1190은 명령 주입을 통한 공개 앱 악용 사례를, CWE-78은 입력에 섞인 OS 명령 해석 위험을 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/",
+      "https://cwe.mitre.org/data/definitions/78.html"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "minRepeat": 5,
+      "alertLevel": 5
+    }
+  },
+  {
+    "name": "웹 주입 의심 신호",
+    "condition": "T1190 표기가 있는 수준 5 이상 경보에서 따옴표·공격 단어·긴 주소·단일 주입 의심 등은 확인 알림만 남김. 이 조건만으로 block하지 않음.",
+    "evidence": "MITRE T1190은 비정상 요청 형태와 앱 로그를 함께 확인하도록 설명하며 단어 하나만으로 공격 성공을 확정하지 않는다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "minRepeat": 5,
+      "alertLevel": 5
+    }
+  }
+]

@@ -9,3 +9,6 @@ xdr/alerts.log
 xdr/brute-force/deny-rules.json
 xdr/brute-force/replay-deny-rules.json
 xdr/brute-force/*.tmp
+xdr/web-injection/deny-rules.json
+xdr/web-injection/replay-deny-rules.json
+xdr/web-injection/*.tmp
