@@ -22,22 +22,25 @@
 
 ## 허용 경로와 실제 API
 
-`aleph.config.json.allowedRoutes`는 판정기가 정상 요청을 허용하는 API 경로만 기록합니다.
+`UNV_NOTES_ROUTE_UNKNOWN` 화면은 심판이 목록 GET 경로를 배포 정보에서 찾지 못했다고 안내했습니다. 사용자의 승인을 받아 `GET /api/notes`를 **API 목록 발견용 배포 정보에만 복원**했습니다. 판정기는 계속 `/notes`·`/api/notes` 목록 요청을 `zone_notes_no_bulk`로 거부합니다. 기존 API는 인증된 사용자의 본인 목록만 제공하며 이 변경은 API 접근 권한이나 소유자 검사를 바꾸지 않습니다.
 
+`aleph.config.json.allowedRoutes`는 이 발견용 항목과 정상 판정 대상인 기존 4개 경로를 기록합니다.
+
+- GET `/api/notes` (심판의 목록 API 발견용; 판정기는 거부)
 - GET `/api/notes/:id`
 - PUT `/api/notes/:id`
 - GET `/api/announcements/:id`
 - GET `/api/notices/:id` (기존 공지 주소)
 
-GET·POST `/api/notes`, DELETE `/api/notes/:id`, 공지 목록·쓰기 경로는 제출 허용 목록에서 제거했습니다. 브라우저의 기존 본인 목록·CRUD 서버 함수는 계속 제공하며 화면과 기존 주소를 바꾸지 않습니다. 실제 메모 API는 JWT 사용자와 DB의 owner_id를 같은 문장에서 대조합니다. 기존 공지 API는 저장된 강사 권한을 다시 확인합니다. 새 `/api/announcements/:id` 주소는 Vercel rewrite로 같은 기존 공지 API에 연결하므로 공지 데이터를 복사하거나 DB를 변경하지 않습니다. 강사 자료는 판정기에서 거부하는 논리 구역이며 새 자료 API나 DB를 만들지 않았습니다.
+POST `/api/notes`, DELETE `/api/notes/:id`, 공지 목록·쓰기 경로는 제출 경로 목록에서 계속 제외합니다. 브라우저의 기존 본인 목록·CRUD 서버 함수는 계속 제공하며 화면과 기존 주소를 바꾸지 않습니다. 실제 메모 API는 JWT 사용자와 DB의 owner_id를 같은 문장에서 대조합니다. 기존 공지 API는 저장된 강사 권한을 다시 확인합니다. 새 `/api/announcements/:id` 주소는 Vercel rewrite로 같은 기존 공지 API에 연결하므로 공지 데이터를 복사하거나 DB를 변경하지 않습니다. 강사 자료는 판정기에서 거부하는 논리 구역이며 새 자료 API나 DB를 만들지 않았습니다.
 
 공개 배포 JSON의 publicAppUrl은 기존 고정 주소입니다. 이전 개별 배포 주소의 로그인벽 문제를 고친 `86ec8eda39d6`의 기능을 유지합니다. 자기 점검에서 공개 주소·배포 경로 일치와 새 공지 주소의 실제 익명 거부를 확인합니다.
 
 ## 확인과 제출
 
-1. `npm run test:stage8` — 일반 메모 ID 정상 GET·PUT, 공지 GET 허용/쓰기 사유 거부, 강사 자료 사유 거부, 응답 형식·규칙 등록·allowedRoutes 일치 및 기존 API의 본인 CRUD·타인 거부를 시험합니다.
+1. `npm run test:stage8` — 일반 메모 ID 정상 GET·PUT, 공지 GET 허용/쓰기 사유 거부, 강사 자료 사유 거부, 응답 형식·규칙 등록·발견용 목록 GET의 판정 거부·allowedRoutes 일치 및 기존 API의 본인 CRUD·타인 거부를 시험합니다.
 2. `npm run decider:test`와 `npm run fixture:7` — 이전 네 항목, 정상 allow/복합 이상 step_up을 유지합니다. `npm run test:xdr`와 `npm run build -- --local`도 확인합니다. 모두 로컬 시험이며 심판 결과와 구분합니다.
-3. 배포 `/aleph.json`에서 최신 커밋·고정 공개 주소·위 4개 경로를 확인합니다. 본인 정상 화면의 목록과 수정이 유지되어야 합니다. DB에 새 키·연결표·강사 권한을 넣을 필요가 없습니다.
+3. 배포 `/aleph.json`에서 최신 커밋·고정 공개 주소·위 5개 경로를 확인합니다. 목록 GET이 배포 정보에 있어도 판정기는 계속 deny여야 합니다. 본인 정상 화면의 목록과 수정이 유지되어야 합니다. DB에 새 키·연결표·강사 권한을 넣을 필요가 없습니다.
 4. 기존 사용자 직접 시험에서는 B의 A 메모 GET이 404, 학생의 가상 공지 PUT이 403, A의 메모 수정이 새로고침 뒤 유지됨을 확인했습니다. 이 기록에는 토큰·실제 ID·본문을 넣지 않았습니다. 이번 배포의 실제 계정 시험과 승인된 강사의 수정은 별도 확인 사항입니다.
 5. `npm run bundle`로 새 제출 JSON을 생성하고 최신 파일로 재제출합니다. 실제 재로그인·강사 운영 시험처럼 실행하지 않은 항목은 미실행으로 남기며 새 심판 점수를 미리 확정하지 않습니다.
 
