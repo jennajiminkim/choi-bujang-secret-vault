@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { decide, RULE_IDS, createResourceDecider } from '../src/decider.mjs';
+import { decide, RULE_IDS } from '../src/decider.mjs';
 import { inspectAccessSignals } from '../src/access-signals.mjs';
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { deploymentIdentity } from '../scripts/deployment-identity.mjs';
@@ -44,9 +44,8 @@ test('미등록 거부와 경로 범위는 유지하고 불명확한 입력은 �
   assert.equal((await decide({...suspicious,method:'POST'})).decision,'deny');
   assert.equal((await decide({...normal,headers:{'x-network':'usual'}})).decision,'step_up');
   assert.equal((await decide({...normal,signals:undefined})).decision,'step_up');
-  const unavailable={...normal,path:'/notes/11111111-1111-4111-8111-111111111111',signals:{source:'none',region:'unknown',network:'unknown',hour:14}};
-  const linked = createResourceDecider({authorize:async()=>true}); // Test-only trusted server grant.
-  assert.deepEqual((await linked(unavailable)).ruleIds,['device_registered','resource_zones']);
+  const unavailable={...normal,signals:{source:'none',region:'unknown',network:'unknown',hour:14}};
+  assert.deepEqual((await decide(unavailable)).ruleIds,['device_registered']);
   assert.equal((await decide({...suspicious,recentEvents:[{kind:'risk_signal',count:'20',ageSeconds:60}]})).decision,'step_up');
 });
 

@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8].includes(config.step)) throw new Error('현재 자기 점검은 5~8단계에 맞춰져 있습니다.');
+  if (![5, 6, 7].includes(config.step)) throw new Error('현재 자기 점검은 5~7단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -58,28 +58,7 @@ export async function runAttackChecks(config) {
     observed: '미실행: 권한 회수 전후 실제 A/B 계정 CRUD 시험은 사용자 확인이 필요합니다. 이전 단계의 A CRUD 확인은 5단계 시험을 대신하지 않습니다.' });
   results.push({ attackId: 'live_direct_grants', expected: '실제 학습 DB에서 PUBLIC·anon·authenticated 직접 권한 없음, 서버 CRUD 유지',
     observed: '미실행: 5단계 권한 회수 SQL은 검토용으로 제공했습니다. 직접 anon 거부 결과만으로 authenticated 권한 회수를 증명하지 않습니다.' });
-  if (config.step === 8) {
-    await check('anonymous_notice_update', `/api/notices/${dummy}`, '공지 수정도 무로그인 401/403 JSON 거부', { method: 'PUT' }, denied);
-    const { normal, suspicious } = fixtureRequests();
-    const own = { ...normal, path: `/notes/${normal.subjectId}--memo`, route: 'GET /notes/:id' };
-    const ownList = { ...normal, classId: 'practice_class', projectId: 'practice_project', subjectId: 'practice_subject',
-      path: '/api/notes', route: 'GET /api/notes', signals: { source: 'none', region: 'unknown', network: 'unknown', hour: 14 } };
-    const ownApiItem = { ...ownList, path: '/api/notes/11111111-1111-4111-8111-111111111111', route: 'GET /api/notes/:id' };
-    const notice = { ...normal, service: 'notices', method: 'PUT', path: '/notices/33333333-3333-4333-8333-333333333333', route: 'PUT /notices/:id' };
-    for (const [attackId, inputs, expected] of [
-      ['local_own_note_zone', [own, { ...own, method: 'PUT', route: 'PUT /notes/:id' }, ownList, ownApiItem], ['allow', 'allow', 'allow', 'allow']],
-      ['local_other_note_zone', [{ ...own, subjectId: 'learner_b_fixture' }], ['deny']],
-      ['local_notice_zone', [notice, { ...notice, subjectId: 'instructor_fixture' }], ['deny', 'deny']],
-      ['local_prior_rules', [normal, { ...normal, deviceRegistered: false }, suspicious], ['allow', 'deny', 'step_up']],
-    ]) {
-      const decisions = [];
-      for (const input of inputs) decisions.push((await decide(input)).decision);
-      results.push({ attackId, expected: `로컬 가상 구역 판정: ${expected.join(', ')}`,
-        observed: `로컬 가상 구역 판정: ${decisions.join(', ')}; ${JSON.stringify(decisions) === JSON.stringify(expected) ? '일치' : '불일치'}; 실제 계정 API 시험 아님` });
-    }
-    results.push({ attackId: 'live_resource_authorization', expected: '실제 사용자 연결·강사 설정 뒤 A 본인 허용, B의 A 자료 및 일반 학생 공지 수정 거부',
-      observed: '미실행: 가상 공지 추가와 빈 강사 표는 사용자 보고입니다. 실제 운영 A/B·강사 API 시험 및 심판 논리 자원 ID와 우리 구역 규약의 일치는 확인되지 않았습니다.' });
-  } else if (config.step >= 6) {
+  if (config.step >= 6) {
     const { normal, suspicious } = fixtureRequests();
     for (const [attackId, request, expected, reason] of [
       ['local_registered_device', normal, 'allow', 'approved'],

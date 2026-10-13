@@ -132,7 +132,7 @@ test('URL owner spoofing cannot grant cross-owner read, update or delete', async
   for (const method of ['GET', 'PUT', 'DELETE']) {
     const res = response();
     await handler({ method, headers: { authorization: `Bearer ${authB}` }, query: { id: run, owner_id: A, userId: A, role: 'admin' }, body: { title: 'blocked', body: 'blocked' } }, res);
-    assert.equal(res.code, 400); assert.deepEqual(Object.keys(res.body), ['error']);
+    assert.equal(res.code, 404); assert.deepEqual(Object.keys(res.body), ['error']);
   }
   assert.equal(db.rows.get(run).owner_id, A); assert.equal(db.rows.get(run).title, 'fixture');
 });
@@ -160,7 +160,7 @@ test('expired, foreign issuer and wrong audience signed tokens are rejected', as
   }
   assert.equal(db.calls(), 0);
 });
-test('deployment identity remains schema v1 and records the current stage', () => {
+test('deployment identity remains schema v1 and records the configured stage', () => {
   const result = deploymentIdentity({ VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'jennajiminkim',
     VERCEL_GIT_REPO_SLUG: 'choi-bujang-secret-vault', VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40),
     VERCEL_URL: 'choi-bujang-secret-vault-tawny.vercel.app' }, config);

@@ -1,14 +1,11 @@
 // ALEPH SDP 엔진이 신원·기기·경로를 확인한 요청만 받습니다.
-// 등록 기기·추가 확인·자원 구역을 검사하고 실제 API는 소유권을 다시 확인합니다.
+// 등록 기기의 자료실 읽기만 허용하고 나머지는 기존 기본 거부를 유지합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 import { inspectAccessSignals } from './access-signals.mjs';
-import { classifyResource } from './resources.mjs';
-import { authorizeServerResource } from './resource-authorization.mjs';
 
-export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required', 'resource_zones']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required']);
 
-export function createResourceDecider({ authorize = authorizeServerResource } = {}) {
-return async function decide(request) {
+export async function decide(request) {
   const response = (decision, reasonCode, ruleId) => ({
     schema: 'aleph.decision.v1',
     requestId: request?.requestId,
@@ -20,16 +17,19 @@ return async function decide(request) {
     return response('deny', 'device_not_registered', 'device_registered');
   }
 
-  const resource = classifyResource(request);
-  if (resource) {
+  // /notes is the engine's service path; /api/notes is the existing app's API path.
+  // Check matching route and path together, rather than trusting a route string alone.
+  const readPath = ['/notes', '/api/notes'].some(base =>
+    (request.route === `GET ${base}` && request.path === base)
+    || (request.route === `GET ${base}/:id` && typeof request.path === 'string'
+      && request.path.startsWith(`${base}/`)
+      && /^[^/?#]+$/.test(request.path.slice(base.length + 1))
+      && !['.', '..'].includes(request.path.slice(base.length + 1)))
+  );
+  if (request.service === 'notes' && request.method === 'GET' && readPath) {
     const context = inspectAccessSignals(request);
     if (context.kind === 'invalid') {
       return response('step_up', 'step_up_required', 'step_up_required');
-    }
-    let granted = false;
-    try { granted = await authorize(request, resource); } catch { /* unresolved permission stays denied */ }
-    if (granted !== true) {
-      return response('deny', 'starter_not_ready', 'resource_zones');
     }
     if (context.kind === 'fixture') {
       const unusualHour = context.signals.hour < 6 || context.signals.hour >= 23;
@@ -43,12 +43,12 @@ return async function decide(request) {
           return response('step_up', 'step_up_required', 'step_up_required');
         }
         return { ...response('allow', 'approved', 'device_registered'),
-          ruleIds: ['device_registered', 'step_up_required', 'resource_zones'] };
+          ruleIds: ['device_registered', 'step_up_required'] };
       }
     }
     // source:none is unavailable, not a fabricated normal risk profile.
-    // Device and resource-zone grants still apply without inventing a normal risk profile.
-    return { ...response('allow', 'approved', 'device_registered'), ruleIds: ['device_registered', 'resource_zones'] };
+    // The existing registered-device rule remains the only basis for allow here.
+    return response('allow', 'approved', 'device_registered');
   }
   return {
     schema: 'aleph.decision.v1',
@@ -57,7 +57,4 @@ return async function decide(request) {
     reasonCode: 'starter_not_ready',
     ruleIds: [RULE_IDS[0]],
   };
-};
 }
-
-export const decide = createResourceDecider();

@@ -1,5 +1,5 @@
 {
-  "step": 8,
+  "step": 7,
   "repoUrl": "https://github.com/jennajiminkim/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-tawny.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -29,18 +29,6 @@
     {
       "method": "DELETE",
       "path": "/api/notes/:id"
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices"
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/:id"
-    },
-    {
-      "method": "PUT",
-      "path": "/api/notices/:id"
     }
   ],
   "originalApiUrl": "https://eqkxsftptrmgacddkswd.supabase.co/rest/v1/notes",
