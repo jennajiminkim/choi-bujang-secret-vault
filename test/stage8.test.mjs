@@ -59,7 +59,7 @@ test('unknown/function/encoded/traversal/route mismatch and student notice write
   }
   assert.equal((await decide({...normal,subjectId:''})).decision,'deny');
   assert.equal((await decide({...normal,method:'PUT',service:'notices',path:`/notices/${N}`,route:'PUT /notices/:id'})).decision,'deny');
-  assert.equal((await decide({...normal,service:'notices',path:`/notices/${N}`,route:'GET /notices/:id'})).decision,'deny');
+  assert.equal((await decide({...normal,service:'notices',path:`/notices/${N}`,route:'GET /notices/:id'})).decision,'allow');
 });
 test('device and compound-risk rules also precede new write/read routes',async()=>{
   const {normal,suspicious}=fixtureRequests();
@@ -70,7 +70,7 @@ test('device and compound-risk rules also precede new write/read routes',async()
     assert.equal((await decide({...suspicious,...routeFields,stepUp:{verified:true,authAgeSeconds:60}})).decision,'allow');
   }
 });
-test('policy denies every collection/function route and all notice/instructor operations',async()=>{
+test('policy rejects note collections/functions and keeps explicit announcement/material boundaries',async()=>{
   const {normal}=fixtureRequests();
   for(const base of ['/notes','/api/notes']) {
     for(const method of ['GET','POST','PUT','PATCH','DELETE']) {
@@ -88,13 +88,63 @@ test('policy denies every collection/function route and all notice/instructor op
       for(const method of ['GET','POST','PUT','PATCH','DELETE']) {
         for(const id of ['',`/${N}`]) {
           const input={...normal,service:zone,method,path:base+id,route:`${method} ${base}${id?'/:id':''}`};
-          assert.equal((await decide(input)).decision,'deny');
+          const allowed = zone === 'announcements' || zone === 'notices';
+          assert.equal((await decide(input)).decision, allowed && method === 'GET' && id ? 'allow' : 'deny');
           // Neither a notes service alias nor a simulated recheck can open this zone.
           assert.equal((await decide({...input,service:'notes',stepUp:{verified:true,authAgeSeconds:60}})).decision,'deny');
         }
       }
     }
   }
+});
+test('announcement writes and instructor materials return named zone reasons registered in RULE_IDS',async()=>{
+  const {normal}=fixtureRequests();
+  for(const service of ['announcements','notices'])for(const base of [`/${service}`,`/api/${service}`]){
+    const read = await decide({...normal,service,path:`${base}/fixture_notice`,route:`GET ${base}/:id`});
+    assert.equal(read.decision,'allow');assert.ok(read.ruleIds.includes('zone_announcements'));
+    for(const method of ['POST','PUT','PATCH','DELETE'])for(const suffix of ['', '/fixture_notice']){
+      const out=await decide({...normal,service,method,path:base+suffix,route:`${method} ${base}${suffix?'/:id':''}`});
+      assert.equal(out.decision,'deny');assert.equal(out.reasonCode,'announcement_write_denied');
+      assert.deepEqual(out.ruleIds,['zone_announcements']);
+    }
+  }
+  for(const service of ['materials','instructors'])for(const base of [`/${service}`,`/api/${service}`]){
+    for(const method of ['GET','POST','PUT','PATCH','DELETE']){
+      const out=await decide({...normal,service,method,path:`${base}/fixture_material`,route:`${method} ${base}/:id`});
+      assert.equal(out.decision,'deny');assert.equal(out.reasonCode,'instructor_material_denied');
+      assert.deepEqual(out.ruleIds,['zone_instructor_materials']);
+    }
+  }
+  for(const input of [normal,{...normal,service:'announcements',path:'/announcements/fixture_notice',route:'GET /announcements/:id'},
+    {...normal,service:'materials',path:'/api/materials/fixture_material',route:'GET /api/materials/:id'}]){
+    const out=await decide(input);assert.match(out.reasonCode,/^[a-z_]+$/);assert.ok(out.ruleIds.every(id=>RULE_IDS.includes(id)));
+    assert.deepEqual(Object.keys(out).sort(),['decision','reasonCode','requestId','ruleIds','schema']);
+  }
+});
+test('generic note IDs stay allowed and advertised routes exactly match normal policy admission',async()=>{
+  const {normal}=fixtureRequests();
+  for(const id of ['demo','note_fixture','note-42',N])for(const base of ['/notes','/api/notes'])for(const method of ['GET','PUT']){
+    assert.equal((await decide({...normal,method,path:`${base}/${id}`,route:`${method} ${base}/:id`})).decision,'allow');
+  }
+  assert.deepEqual(config.allowedRoutes,[{method:'GET',path:'/api/notes/:id'},{method:'PUT',path:'/api/notes/:id'},
+    {method:'GET',path:'/api/announcements/:id'},{method:'GET',path:'/api/notices/:id'}]);
+  for(const route of config.allowedRoutes){
+    const service=route.path.split('/')[2];
+    assert.equal((await decide({...normal,service,method:route.method,path:route.path.replace(':id','fixture_resource'),route:`${route.method} ${route.path}`})).decision,'allow');
+  }
+  const routing=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
+  assert.ok(routing.rewrites.some(r=>r.source==='/api/announcements/:id' && r.destination==='/api/notices?id=:id'));
+});
+test('device, query and risk checks also protect announcement reads; recheck cannot unlock writes',async()=>{
+  const {normal,suspicious}=fixtureRequests();
+  const fields={service:'announcements',path:'/api/announcements/fixture_notice',route:'GET /api/announcements/:id'};
+  assert.equal((await decide({...normal,...fields,deviceRegistered:false})).reasonCode,'device_not_registered');
+  assert.equal((await decide({...normal,...fields,queryLength:1})).decision,'deny');
+  assert.equal((await decide({...normal,...fields,headers:{'x-role':'instructor'}})).decision,'step_up');
+  assert.equal((await decide({...suspicious,...fields})).decision,'step_up');
+  const fresh={...suspicious,...fields,stepUp:{verified:true,authAgeSeconds:60}};
+  assert.equal((await decide(fresh)).decision,'allow');
+  assert.equal((await decide({...fresh,method:'PUT',route:'PUT /api/announcements/:id'})).reasonCode,'announcement_write_denied');
 });
 test('policy denies query-bearing or mismatched requests without inferring a query function',async()=>{
   const {normal}=fixtureRequests();

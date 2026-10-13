@@ -1,42 +1,45 @@
-# 8단계 저장점 — 개별 메모만 판정기에 허용
+# 8단계 저장점 — 메모·공지·강사 자료 구역 규칙
 
-## 공개 배포 주소 정정
+## 최신 수업 안내 반영
 
-`UNV_NOTES_ROUTE_UNKNOWN` 확인 과정에서 allowedRoutes의 `GET /api/notes`와 기존 화면의 호출은 정상임을 확인했습니다. 공개 자료실의 `/api/notes`는 미로그인 요청에 401 JSON을 반환하지만, 배포 JSON의 publicAppUrl이 가리킨 개별 Vercel 배포는 로그인 HTML로 넘어갔습니다. 이 차이가 심판 탐색을 막았을 가능성이 높아 `scripts/deployment-identity.mjs`가 설정의 공개 고정 주소를 기록하도록 수정했습니다. 저장소·커밋은 계속 Vercel Git 메타데이터로 검증합니다. URL은 HTTPS·루트 경로·인증 정보와 쿼리 없음으로 검사합니다.
+3차 심판에 관한 사용자 제공 설명에 맞춰 공지와 강사 자료를 명시적인 구역으로 정의했습니다. `src/resources.mjs`가 자원 구역을 구분하고 `src/decider.mjs`가 아래 규칙을 적용합니다. 메모 ID 검사 범위는 그대로입니다. 판정기는 `demo`, `note_fixture`, `note-42` 같은 일반 ID도 받아들이며 UUID로 좁히지 않습니다. 실제 DB 메모·공지 UUID 형식과 소유자는 최종 API가 검사합니다.
 
-`aleph.config.json`의 기존 공개 주소와 GET 목록 경로는 그대로입니다. 판정기의 목록 거부와 최종 API의 본인 목록 제공은 유지합니다. 자기 점검은 배포 단계뿐 아니라 publicAppUrl 일치도 확인합니다. 배포 완료 후 `/aleph.json`의 주소·최신 커밋과 공개 API의 401 JSON을 재확인하고 새 JSON으로 재제출합니다. 이는 잘못된 배포 주소를 고친 것이며 실제 새 심판 결과는 별도로 확인합니다.
+| 구역·경로 | 판정기 동작 | 규칙·사유 |
+| --- | --- | --- |
+| GET·PUT `/notes/:id`, `/api/notes/:id` | 정상 조건 허용 | `zone_notes_self` · `approved` |
+| 메모 목록 `/notes`, `/api/notes` | 거부 | `zone_notes_no_bulk` |
+| GET `/announcements/:id`, `/api/announcements/:id` | 정상 조건 허용 | `zone_announcements` · `approved` |
+| 기존 공지 GET `/notices/:id`, `/api/notices/:id` | 같은 공지 구역의 주소로 허용 | `zone_announcements` |
+| 공지 구역 POST·PUT·PATCH·DELETE | 명시적 쓰기 거부 | `zone_announcements` · `announcement_write_denied` |
+| 공지 목록·맞지 않는 읽기 경로 | 구역 규칙 거부 | `zone_announcements` · `announcement_read_denied` |
+| 강사 자료 `/materials`, `/api/materials` 및 개별 경로 | 모든 동작 거부 | `zone_instructor_materials` · `instructor_material_denied` |
+| `/instructors`, `/api/instructors` | 같은 강사 구역으로 모든 동작 거부 | `zone_instructor_materials` |
+| 그 밖의 경로·메모 POST·PATCH·DELETE·기능·쿼리 요청 | 기존 기본 거부 | `starter.deny` |
 
-## 심판 안내에 따른 보강
+등록 기기·엔진 확인 사용자·정확한 메서드/경로/route·빈 쿼리 조건을 유지합니다. 미등록은 `device_not_registered`, 복합 이상 사건은 `step_up_required`로 추가 확인합니다. 검증된 가상 재확인은 허용 대상 읽기/수정을 다시 판단하며 공지 쓰기나 강사 자료 거부를 해제하지 않습니다. 위치·역할을 클라이언트 헤더에서 믿지 않습니다. 소유자를 최초 요청자로 기억하거나 주체 ID를 DB UUID와 비교하지 않습니다.
 
-이전 저장점 `cbf2dc24ee73`의 심판 안내는 `S08_OTHER_ZONE_ALLOWED`이며 허용된 요청으로 `GET /notes`가 명시됐습니다. API 목록이 본인 메모만 반환하더라도 판정기에서 목록 경로 자체를 열면 안 된다는 안내에 따라 판정기를 좁혔습니다. 메모 한 건의 소유자 비교는 API가 수행하면 된다는 안내도 반영했습니다. 앞서 판정기 단독 소유자 계약이 필수라고 적은 해석은 수정합니다.
+이번 3차 심판의 이유 코드 형식 안내는 `docs/DECIDER_REQUEST.md`에 적용 범위를 명시해 보충했습니다. 요청 18항목·응답 5항목은 유지하며 모든 ruleIds는 RULE_IDS에 등록된 실제 규칙입니다.
 
-| 경로·조건 | 판정기 동작 |
-| --- | --- |
-| GET·PUT `/notes/:id`, `/api/notes/:id` | 검증된 사용자·등록 기기·정확한 경로·빈 쿼리일 때 허용; 소유자 비교는 최종 API |
-| `/notes`, `/api/notes` 목록/컬렉션 | `deny`, `zone_notes_no_bulk` |
-| 공지·강사 구역 및 그 밖의 경로 | 기존 기본 거부 |
-| 메모 POST·PATCH·DELETE, all·export 등 기능 경로, 쿼리 포함 요청 | 거부 |
-| 미등록 기기 | `deny / device_not_registered` 유지 |
-| 허용 대상 경로의 복합 이상 접속 | `step_up` 유지; 검증된 가상 재확인 뒤 다시 판단 |
+## 허용 경로와 실제 API
 
-`zone_notes_self`는 개별 GET·PUT 경로를 검사합니다. 이름으로 소유권을 추정하거나 첫 요청자를 주인으로 기억하지 않습니다. 주체 ID와 DB 사용자 UUID를 비교하지 않으며 새 역할 필드를 만들지 않습니다. 요청·응답 계약과 이전 7단계 입력은 그대로 유지합니다.
+`aleph.config.json.allowedRoutes`는 판정기가 정상 요청을 허용하는 API 경로만 기록합니다.
 
-## 최종 API와 기존 화면
+- GET `/api/notes/:id`
+- PUT `/api/notes/:id`
+- GET `/api/announcements/:id`
+- GET `/api/notices/:id` (기존 공지 주소)
 
-메모와 공지는 `notes:<UUID>`, `notices:<UUID>` 및 `X-Resource-Id`로 구분합니다. 메모 API는 JWT 검증 결과와 저장된 `owner_id`를 같은 DB 문장에서 비교하며 A 본인의 CRUD는 허용하고 B의 A 메모 요청은 404입니다. 공지 API는 `vault_instructors`의 저장된 권한을 확인하고 SQL 함수가 쓰기 시점에 재검사합니다. 학생은 403입니다. 역할을 클라이언트 본문이나 화면 메뉴에서 읽지 않습니다.
+GET·POST `/api/notes`, DELETE `/api/notes/:id`, 공지 목록·쓰기 경로는 제출 허용 목록에서 제거했습니다. 브라우저의 기존 본인 목록·CRUD 서버 함수는 계속 제공하며 화면과 기존 주소를 바꾸지 않습니다. 실제 메모 API는 JWT 사용자와 DB의 owner_id를 같은 문장에서 대조합니다. 기존 공지 API는 저장된 강사 권한을 다시 확인합니다. 새 `/api/announcements/:id` 주소는 Vercel rewrite로 같은 기존 공지 API에 연결하므로 공지 데이터를 복사하거나 DB를 변경하지 않습니다. 강사 자료는 판정기에서 거부하는 논리 구역이며 새 자료 API나 DB를 만들지 않았습니다.
 
-브라우저는 기존 서버 함수로 본인 목록·CRUD를 수행하므로 판정기의 목록 거부가 화면의 본인 메모 목록을 없애지 않습니다. 기존 화면·주소·API·SQL·DB 자료·로그인·XDR 작업은 이번 보강에서 수정하지 않습니다. 배포 메타데이터의 allowedRoutes는 기존 실제 API 경로를 유지하며 개별 판정기의 허용 범위와 구분합니다.
+공개 배포 JSON의 publicAppUrl은 기존 고정 주소입니다. 이전 개별 배포 주소의 로그인벽 문제를 고친 `86ec8eda39d6`의 기능을 유지합니다. 자기 점검에서 공개 주소·배포 경로 일치와 새 공지 주소의 실제 익명 거부를 확인합니다.
 
-사용자 직접 확인: B로 로그인한 별도 시크릿 창에서 A의 실제 메모 ID를 요청해 404를 확인했고, 학생의 가상 공지 PUT은 403을 확인했습니다. A는 본인 메모를 수정하고 새로고침 후 변경 유지를 확인했습니다. 계정·토큰·실제 자료 ID·본문은 기록하지 않습니다. 이는 API의 브라우저 시험이며 새 저장점의 심판 판정은 별도입니다.
+## 확인과 제출
 
-## 재실행 및 제출
-
-1. `npm run test:stage8` — 개별 GET·PUT 허용, 목록·공지·기능·쿼리 거부 및 최종 API의 본인 CRUD·타인 거부·학생/강사 권한 시험을 실행합니다. 컬렉션 허용을 기대하던 로컬 시험은 8단계 요구에 맞춰 거부 기대값으로 변경했습니다.
-2. `npm run decider:test`와 `npm run fixture:7` — 기존 네 항목 및 정상 allow/복합 이상 step_up을 확인합니다. 가상 요청 연습이며 심판 통과 증거가 아닙니다.
-3. `npm run test:xdr`와 `npm run build -- --local` — 기존 추가 검사와 화면 빌드를 확인합니다.
-4. 최신 배포 `/aleph.json`에서 step 8 및 새 저장점 commit을 확인합니다. 기존 화면에서 본인 메모 목록·읽기·수정이 유지돼야 합니다. DB에 새 키·연결표·권한을 추가할 필요가 없습니다. `vault_instructors`가 비어 있으면 누구도 공지를 수정할 수 없습니다.
-5. `npm run bundle`로 최신 제출 JSON을 생성합니다. HTTP 점검과 로컬 정책 점검을 구분합니다. 실제 강사 수정·운영 재로그인 등 실행하지 않은 시험은 미실행으로 남깁니다.
-6. 최신 JSON으로 심판에 다시 제출하고 새 결과를 확인합니다. 로컬 시험과 이전 브라우저 시험으로 새 심판 점수를 미리 확정하지 않습니다.
+1. `npm run test:stage8` — 일반 메모 ID 정상 GET·PUT, 공지 GET 허용/쓰기 사유 거부, 강사 자료 사유 거부, 응답 형식·규칙 등록·allowedRoutes 일치 및 기존 API의 본인 CRUD·타인 거부를 시험합니다.
+2. `npm run decider:test`와 `npm run fixture:7` — 이전 네 항목, 정상 allow/복합 이상 step_up을 유지합니다. `npm run test:xdr`와 `npm run build -- --local`도 확인합니다. 모두 로컬 시험이며 심판 결과와 구분합니다.
+3. 배포 `/aleph.json`에서 최신 커밋·고정 공개 주소·위 4개 경로를 확인합니다. 본인 정상 화면의 목록과 수정이 유지되어야 합니다. DB에 새 키·연결표·강사 권한을 넣을 필요가 없습니다.
+4. 기존 사용자 직접 시험에서는 B의 A 메모 GET이 404, 학생의 가상 공지 PUT이 403, A의 메모 수정이 새로고침 뒤 유지됨을 확인했습니다. 이 기록에는 토큰·실제 ID·본문을 넣지 않았습니다. 이번 배포의 실제 계정 시험과 승인된 강사의 수정은 별도 확인 사항입니다.
+5. `npm run bundle`로 새 제출 JSON을 생성하고 최신 파일로 재제출합니다. 실제 재로그인·강사 운영 시험처럼 실행하지 않은 항목은 미실행으로 남기며 새 심판 점수를 미리 확정하지 않습니다.
 
 ---
 

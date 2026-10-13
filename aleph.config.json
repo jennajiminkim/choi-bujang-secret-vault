@@ -12,14 +12,6 @@
   "allowedRoutes": [
     {
       "method": "GET",
-      "path": "/api/notes"
-    },
-    {
-      "method": "POST",
-      "path": "/api/notes"
-    },
-    {
-      "method": "GET",
       "path": "/api/notes/:id"
     },
     {
@@ -27,19 +19,11 @@
       "path": "/api/notes/:id"
     },
     {
-      "method": "DELETE",
-      "path": "/api/notes/:id"
+      "method": "GET",
+      "path": "/api/announcements/:id"
     },
     {
       "method": "GET",
-      "path": "/api/notices"
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/:id"
-    },
-    {
-      "method": "PUT",
       "path": "/api/notices/:id"
     }
   ],

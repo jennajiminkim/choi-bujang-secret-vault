@@ -59,7 +59,7 @@ export async function runAttackChecks(config) {
   results.push({ attackId: 'live_direct_grants', expected: '실제 학습 DB에서 PUBLIC·anon·authenticated 직접 권한 없음, 서버 CRUD 유지',
     observed: '미실행: 5단계 권한 회수 SQL은 검토용으로 제공했습니다. 직접 anon 거부 결과만으로 authenticated 권한 회수를 증명하지 않습니다.' });
   if (config.step === 8) {
-    await check('anonymous_notices', '/api/notices', '로그인 없이 공지 API 요청은 401 또는 403 JSON 오류', {method:'GET'}, denied);
+    await check('anonymous_announcements', `/api/announcements/${dummy}`, '로그인 없이 공지 개별 API 요청은 401 또는 403 JSON 오류', {method:'GET'}, denied);
     const {normal, suspicious} = fixtureRequests();
     const priorCases = [[normal, 'allow'], [{...normal, deviceRegistered:false}, 'deny'],
       [suspicious, 'step_up'], [{...suspicious,stepUp:{verified:true,authAgeSeconds:60}}, 'allow']];
@@ -72,12 +72,17 @@ export async function runAttackChecks(config) {
       [{...normal,path:'/notes/export'},'deny'],
       [{...normal,path:'/notes',route:'GET /notes'},'deny'],
       [{...normal,path:'/api/notes',route:'GET /api/notes'},'deny'],
-      [{...normal,service:'notices',path:`/notices/${dummy}`,route:'GET /notices/:id'},'deny'],
+      [{...normal,service:'notices',path:`/notices/${dummy}`,route:'GET /notices/:id'},'allow'],
       [{...normal,service:'notices',method:'PUT',path:`/notices/${dummy}`,route:'PUT /notices/:id'},'deny'],
+      [{...normal,service:'announcements',path:'/api/announcements/fixture_notice',route:'GET /api/announcements/:id'},'allow'],
+      [{...normal,service:'announcements',method:'PUT',path:'/api/announcements/fixture_notice',route:'PUT /api/announcements/:id'},'deny'],
+      [{...normal,service:'materials',path:'/api/materials/fixture_material',route:'GET /api/materials/:id'},'deny'],
     ];
     const pathResults = await Promise.all(paths.map(async ([input,expected]) => (await decide(input)).decision === expected));
-    results.push({attackId:'local_resource_routes',expected:'로컬 개별 GET·PUT 허용; 메모 목록·기능 경로·공지 거부',
-      observed:`로컬 ${pathResults.filter(Boolean).length}/${paths.length} 일치; API 진입 허용은 소유권 증명 아님`});
+    const announcement = await decide({...normal,service:'announcements',method:'PUT',path:'/api/announcements/fixture_notice',route:'PUT /api/announcements/:id'});
+    const material = await decide({...normal,service:'materials',path:'/api/materials/fixture_material',route:'GET /api/materials/:id'});
+    results.push({attackId:'local_resource_routes',expected:'로컬 개별 메모 GET·PUT 및 공지 GET 허용; 목록·공지 쓰기·강사 자료 거부',
+      observed:`로컬 ${pathResults.filter(Boolean).length}/${paths.length} 일치; 공지 쓰기 ${announcement.reasonCode}; 강사 자료 ${material.reasonCode}; 소유자는 최종 API가 비교`});
     results.push({attackId:'live_instructor_update',expected:'승인된 강사만 공지 수정, 학생은 403',
       observed:'미실행: 실제 학습 DB의 강사 설정 및 학생/강사 인증 요청은 사용자 확인이 필요합니다. 로컬 API·SQL 시험과 구분합니다.'});
     const bulk = await decide({...normal,path:'/notes',route:'GET /notes'});
