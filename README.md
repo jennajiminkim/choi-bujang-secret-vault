@@ -1,6 +1,38 @@
-# BYTE BACK 방어전 · 5단계 저장점
+# BYTE BACK 방어전 · 6단계 저장점
 
-같은 자료실에 5단계 **「자료 요청을 서버 한곳으로 모읍니다」**를 준비했습니다. Supabase 로그인·로그아웃, 원본 토큰 검증 도우미, 서버의 소유자 검사, 가상 메모와 기존 서버 전용 설정을 유지합니다. 아래 SQL은 검토용이며 실제 Supabase에 자동 적용하지 않습니다.
+같은 자료실에 6단계 **「등록한 기기만 자료실에 들어옵니다」**를 추가했습니다. `src/decider.mjs`는 엔진이 확인한 등록 기기의 자료 읽기만 허용합니다. Supabase 로그인·로그아웃, 서버의 소유자 검사, 기존 화면·주소·DB 설정과 두 XDR 보너스를 보존합니다. 아래 5단계 SQL 기록은 그대로이며 SQL을 이번에 다시 적용하지 않습니다.
+
+## 6단계 판정 규칙과 확인 순서
+
+- 엔진이 확인한 사용자 정보는 `request.subjectId`, 등록 여부는 요청 최상위의 `request.deviceRegistered`입니다. Supabase ID와 직접 비교하거나 브라우저의 자기신고 값을 믿지 않습니다.
+- `deviceRegistered === true`이며 service가 notes, method가 GET이고 경로와 route가 맞는 자료 읽기만 `allow / approved / device_registered`입니다. 엔진 경로 `/notes`, `/notes/:id`와 기존 앱 경로 `/api/notes`, `/api/notes/:id`를 확인합니다.
+- 미등록·누락·문자열·숫자 등 정확한 true가 아닌 값은 `deny / device_not_registered / device_registered`입니다. 다른 서비스·쓰기·불일치 경로는 기존 `starter.deny / starter_not_ready`로 거부합니다. RULE_IDS에는 실제 사용되는 두 규칙만 있습니다.
+- 이 함수는 신원·기기·경로를 검증한 운영 엔진에서 부르는 부품입니다. 브라우저 API에 판정 입력을 새로 받도록 변경하지 않았습니다. 현재 Supabase 로그인 및 CRUD 화면과 별개의 엔진 판정이며, 화면이 열린다는 사실만으로 기기 등록 판정의 적용을 증명하지 않습니다.
+- 새 인증서·CA·서명 키·개인키 파일은 만들지 않았고 따로 설치할 접속 프로그램이 없습니다. 운영 엔진은 실제 릴레이에서 미등록 기기를 먼저 막으며, false 판정 요청의 공격 시험은 심판이 수행합니다.
+
+로컬 시험을 실제 실행했습니다.
+
+```bash
+npm run decider:test
+```
+
+```text
+통과 · 등록 기기의 정상 요청
+통과 · 미등록 기기의 가상 요청
+이 명령은 가상 요청으로 연습하며 심판 통과 증거가 아닙니다.
+```
+
+별도 출력으로 true → allow/approved, false·누락 → deny/device_not_registered를 확인했습니다. `node --test test/stage6.test.mjs`의 경계값·읽기 범위·배포 식별 정보 시험 3개와 `npm run test:xdr`의 기존 시험 14개도 통과했습니다. 시험용 가상 요청에서 실제 토큰이나 기기 키를 만들지 않습니다.
+
+직접 확인은 다음 순서입니다.
+
+1. Vercel의 최신 배포가 **6단계 저장점** 커밋에서 성공했는지 확인합니다. 기존 프로젝트·환경변수·주소를 유지합니다.
+2. 기존 등록 기기에서 기존 자료실 주소를 열고 로그인·본인 메모 목록·읽기가 계속 동작하는지 확인합니다. 운영 수업 화면이 등록 기기의 접속 경로를 제공한다면 그 경로에서도 자료 읽기를 확인합니다. 미등록 기기 공격은 심판에 맡깁니다.
+3. GitHub `src/decider.mjs`에서 `device_registered`와 `deviceRegistered !== true` 거부 조건을 확인합니다. 로컬에서는 최신 내용을 Pull한 뒤 위 판정기 시험을 실행합니다.
+4. 배포 주소 `/aleph.json`에서 step 6과 최신 커밋을, `/data.json`에서 메모 0건을 확인합니다. `/api/notes`를 로그아웃 상태로 직접 열면 401 또는 403 JSON 거부여야 합니다.
+5. 제출 JSON의 step 6·최신 commit·policyRules를 확인하고 제출합니다. 비밀번호·토큰·서버 전용 키·기기 개인키를 채팅이나 첨부 자료에 넣지 않습니다.
+
+빌드와 배포 식별 정보·HTTP 자기 점검은 5~6단계에 대응하도록 갱신했습니다. 제출 자기 점검은 HTTP 요청의 실제 결과와 로컬 기기 판정 결과를 구분합니다. 실제 등록 기기 접속 및 미등록 기기 심판 공격은 자동으로 완료했다고 기록하지 않습니다. 보너스 절의 기본 판정기 상태는 각 저장점 당시 기록이며 현재 판정기는 이 6단계 규칙입니다.
 
 ## 브라우저와 서버의 현재 경로
 
@@ -54,7 +86,7 @@
 
 ## 설정·추가점수 확인
 
-- `aleph.config.json.step`과 배포 `/aleph.json`은 5입니다. 배포 스키마 `aleph.defense.deployment.v1`을 유지합니다.
+- `aleph.config.json.step`은 6이며 새 배포 `/aleph.json`에도 6을 기록합니다. 실제 최신 배포 반영은 위 순서로 확인합니다. 배포 스키마 `aleph.defense.deployment.v1`을 유지합니다.
 - `originalApiUrl`은 쿼리 없는 `https://eqkxsftptrmgacddkswd.supabase.co/rest/v1/notes`입니다.
 - `/aleph.json`에 위 다섯 `allowedRoutes`와 `originalApiUrl`도 빌드 시 자동 기록합니다.
 - 운영 측 `judgeIssuer`, 로그인 발급자 정보, 실제 앱 주소는 유지합니다.
@@ -73,7 +105,7 @@ npm run test:stage5
 
 `test:stage5`는 원래 로그인·소유자 API 테스트와 로컬 PGlite PostgreSQL SQL 테스트입니다. 4단계 GRANT/RLS를 거쳐 5단계 실제 회수 SQL을 적용하고 anon/authenticated 직접 CRUD 거부, 별도 열 권한 제거, 기존 서버 함수로 A/B CRUD 허용·타인/소유자 변경 거부, 자료·RLS·다른 테이블 보존, 재실행, 상속 권한이 남을 때 중단을 검사합니다. 시험 서명 키와 가상 계정은 프로세스 안에서만 사용합니다.
 
-커밋 메시지는 **5단계 저장점**입니다. 저장점 뒤 실행합니다.
+현재 커밋 메시지는 **6단계 저장점**입니다. 저장점 뒤 실행합니다.
 
 ```bash
 npm run bundle
