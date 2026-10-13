@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from './verify-login.mjs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+import { UUID, apiResourceId } from './resources.mjs';
 const fields = 'id,title,content,owner_id';
 const noteJson = note => ({ id: note.id, title: note.title, body: note.content });
 
@@ -12,9 +12,10 @@ export function createNotesHandler({ config, supabase, judgeKeySet }) {
     const user = await verify(req.headers.authorization);
     if (!user) return res.status(401).json({ error: '로그인이 필요하거나 인증이 만료되었습니다.' });
     const id = req.query?.id;
-    if (id !== undefined && (typeof id !== 'string' || !UUID.test(id))) {
-      return res.status(400).json({ error: '메모 ID는 UUID여야 합니다.' });
+    if (Object.keys(req.query ?? {}).some(key => key !== 'id') || (id !== undefined && (typeof id !== 'string' || !UUID.test(id)))) {
+      return res.status(400).json({ error: '쿼리에는 UUID 자료 ID만 지정할 수 있습니다.' });
     }
+    res.setHeader('X-Resource-Id', apiResourceId('notes', id));
     const allowed = id ? ['GET', 'PUT', 'DELETE'] : ['GET', 'POST'];
     if (!allowed.includes(req.method)) {
       res.setHeader('Allow', allowed.join(', '));

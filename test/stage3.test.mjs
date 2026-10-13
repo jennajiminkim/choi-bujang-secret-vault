@@ -132,7 +132,7 @@ test('URL owner spoofing cannot grant cross-owner read, update or delete', async
   for (const method of ['GET', 'PUT', 'DELETE']) {
     const res = response();
     await handler({ method, headers: { authorization: `Bearer ${authB}` }, query: { id: run, owner_id: A, userId: A, role: 'admin' }, body: { title: 'blocked', body: 'blocked' } }, res);
-    assert.equal(res.code, 404); assert.deepEqual(Object.keys(res.body), ['error']);
+    assert.equal(res.code, 400); assert.deepEqual(Object.keys(res.body), ['error']);
   }
   assert.equal(db.rows.get(run).owner_id, A); assert.equal(db.rows.get(run).title, 'fixture');
 });

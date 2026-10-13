@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7].includes(config.step)) throw new Error('현재 자기 점검은 5~7단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8].includes(config.step)) throw new Error('현재 자기 점검은 5~8단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -58,6 +58,31 @@ export async function runAttackChecks(config) {
     observed: '미실행: 권한 회수 전후 실제 A/B 계정 CRUD 시험은 사용자 확인이 필요합니다. 이전 단계의 A CRUD 확인은 5단계 시험을 대신하지 않습니다.' });
   results.push({ attackId: 'live_direct_grants', expected: '실제 학습 DB에서 PUBLIC·anon·authenticated 직접 권한 없음, 서버 CRUD 유지',
     observed: '미실행: 5단계 권한 회수 SQL은 검토용으로 제공했습니다. 직접 anon 거부 결과만으로 authenticated 권한 회수를 증명하지 않습니다.' });
+  if (config.step === 8) {
+    await check('anonymous_notices', '/api/notices', '로그인 없이 공지 API 요청은 401 또는 403 JSON 오류', {method:'GET'}, denied);
+    const {normal, suspicious} = fixtureRequests();
+    const priorCases = [[normal, 'allow'], [{...normal, deviceRegistered:false}, 'deny'],
+      [suspicious, 'step_up'], [{...suspicious,stepUp:{verified:true,authAgeSeconds:60}}, 'allow']];
+    const priorResults = await Promise.all(priorCases.map(async ([input,expected]) => (await decide(input)).decision === expected));
+    results.push({attackId:'local_previous_rules',expected:'로컬 가상 정상·미등록·복합 이상·가상 재확인 네 항목 유지',
+      observed:`로컬 ${priorResults.filter(Boolean).length}/4 일치; 실제 엔진 시험 아님`});
+    const paths = [
+      [{...normal,path:`/api/notes/${dummy}`,route:'GET /api/notes/:id'}, 'allow'],
+      [{...normal,method:'PUT',path:`/api/notes/${dummy}`,route:'PUT /api/notes/:id'}, 'allow'],
+      [{...normal,path:'/notes/export'},'deny'],
+      [{...normal,service:'notices',method:'PUT',path:`/notices/${dummy}`,route:'PUT /notices/:id'},'deny'],
+    ];
+    const pathResults = await Promise.all(paths.map(async ([input,expected]) => (await decide(input)).decision === expected));
+    results.push({attackId:'local_resource_routes',expected:'로컬 메모 API 진입 허용, 기능 경로·미확인 강사 쓰기 거부',
+      observed:`로컬 ${pathResults.filter(Boolean).length}/4 일치; API 진입 허용은 소유권 증명 아님`});
+    results.push({attackId:'live_instructor_update',expected:'승인된 강사만 공지 수정, 학생은 403',
+      observed:'미실행: 실제 학습 DB의 강사 설정 및 학생/강사 인증 요청은 사용자 확인이 필요합니다. 로컬 API·SQL 시험과 구분합니다.'});
+    results.push({attackId:'engine_owner_contract',expected:'판정기가 엔진 검증 소유자와 강사 권한을 받아 구역별 판단',
+      observed:'미구현: 현재 18개 입력 계약에 소유자·강사 권한이 없습니다. 임의 연결표를 만들지 않고 최종 API에서 검증된 사용자와 DB 소유자를 대조합니다.'});
+    results.push({attackId:'live_step_up_flow',expected:'운영 엔진에서 새 로그인 검증 전 자료 차단, 재검증 후 요청 허용',
+      observed:'미실행: 실제 재로그인·확인 요청 연결 계약이 없어 로컬 가상 사건만 시험했습니다.'});
+    return results;
+  }
   if (config.step >= 6) {
     const { normal, suspicious } = fixtureRequests();
     for (const [attackId, request, expected, reason] of [
