@@ -1,0 +1,12 @@
+{
+  "schema": "vault.resources.v1",
+  "resources": [
+    { "id": "notes:list", "service": "notes", "api": "/api/notes", "methods": ["GET", "POST"], "permission": "verified owner; insert owner is assigned by server" },
+    { "id": "notes:<uuid>", "service": "notes", "api": "/api/notes/:id", "methods": ["GET", "PUT", "DELETE"], "permission": "stored owner matches verified user" },
+    { "id": "notices:list", "service": "notices", "api": "/api/notices", "methods": ["GET"], "permission": "verified library user" },
+    { "id": "notices:<uuid>", "service": "notices", "api": "/api/notices/:id", "methods": ["GET", "PUT"], "permission": "read: verified library user; update: server-stored instructor grant" }
+  ],
+  "query": "id only; no operation, role or owner selectors",
+  "unknownPath": "deny",
+  "identity": "engine subjectId is linked to database userId by a server-managed class/project mapping, never by direct equality"
+}

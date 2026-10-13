@@ -1,6 +1,32 @@
-# BYTE BACK 방어전 · 7단계 저장점
+# BYTE BACK 방어전 · 8단계 저장점
 
-같은 자료실에 7단계 **「평소와 다른 접속은 다시 확인합니다」**를 추가했습니다. 6단계 기기 규칙·자료 읽기 범위를 유지하고, 출처가 확인된 가상 복합 이상 사건에 추가 본인 확인을 요구합니다. 기존 화면·주소·로그인·DB 설정과 두 XDR 보너스는 보존합니다. 아래 5·6단계 및 보너스 절은 각 저장점 당시 기록이며 현재 판정기의 추가 규칙은 다음 절에 설명합니다.
+같은 자료실에 8단계 **「자료마다 갈 수 있는 구역을 나눕니다」**를 추가했습니다. 기존 기기·추가 확인 규칙과 메모 화면·주소·로그인·DB 자료 및 두 XDR 보너스를 유지합니다. 아래 5~7단계와 보너스 절은 각 저장점 당시 기록입니다. 새 공지 및 운영 판정기 사용자 연결은 관리자 설정이 필요하며 아직 실제 학습 DB에 적용하지 않았습니다.
+
+## 8단계 자원 구역·API 재확인
+
+자원 목록은 [`docs/RESOURCES.json`](docs/RESOURCES.json), 실행·설정·브라우저 확인 순서는 [`docs/STEP8_CHECK.md`](docs/STEP8_CHECK.md)에 있습니다. notes:UUID와 notices:UUID를 구분하고 정확한 service·method·path·route를 검사합니다. 자료 ID 슬롯은 UUID이며 export 같은 기능 경로를 섞지 않고 쿼리에는 자료 id만 받습니다. 기존 화면 메뉴는 변경하지 않았습니다.
+
+판정기의 resource_zones는 엔진이 확인한 classId/projectId/subjectId를 서버 관리 vault_subject_links로 DB 사용자에게 연결한 뒤 메모 소유자 또는 vault_instructors를 확인합니다. subjectId를 Supabase UUID와 직접 비교하거나 request.role을 만들지 않습니다. 실시간 연결이 없거나 조회가 실패하면 거부합니다. 고정 class_fixture/project_fixture의 A/B·강사는 가상 시험 전용이며 실제 권한을 만들지 않습니다. RULE_IDS에는 starter.deny, device_registered, step_up_required, resource_zones가 있습니다.
+
+메모 API는 저장된 소유자를 조회·수정·삭제 SQL 조건에 다시 대조하며 본인 목록과 기존 CRUD는 유지합니다. 새 공지 API는 인증된 사용자 읽기와 서버 저장 강사 수정만 허용하고, UPDATE를 실행하는 SQL RPC도 강사 권한을 다시 검사합니다. 메뉴·본문 role·쿼리 권한은 믿지 않습니다. 거부 결과는 다른 사람/없는 메모 404, 학생 공지 수정 403 instructor_required, 잘못된 기능 쿼리 400입니다.
+
+## 8단계 시험 결과와 실제 적용 순서
+
+```bash
+npm run test:stage8
+npm run decider:test
+npm run fixture:7
+npm run test:xdr
+```
+
+로컬 검증: 구역/API/기존 CRUD/기기/추가 확인/SQL 시험 **27개**, 기존 XDR **14개** 통과입니다. A 자기 메모 읽기·수정 allow/200, B의 A 메모 deny/404, 학생 공지 수정 deny/403, 저장된 강사 수정 allow/200을 확인했습니다. source/헤더 검사와 복합 이상 step_up도 유지됩니다. 서명 검증 시험의 가상 키는 메모리에만 있으며 실제 토큰이나 키를 Git·로그·제출에 저장하지 않습니다.
+
+1. Supabase SQL Editor에서 [`supabase/step8_resources.sql`](supabase/step8_resources.sql)을 검토·실행합니다. 기존 notes나 Auth 계정은 변경하지 않습니다.
+2. Table Editor에서 가상 공지와 승인된 강사 계정 권한을 설정하고, 운영 엔진의 실제 class/project/subject를 확인한 후 DB 사용자와 연결합니다. 식별값을 추측하지 않습니다. 별도 운영 판정기의 서버 권한 조회 환경도 운영자가 확인해야 합니다.
+3. 기존 화면에서 A/B 본인 읽기·수정이 유지되는지 확인합니다. B의 인증된 직접 API로 A 메모 요청은 404, 일반 학생의 공지 PUT은 403이며 자료가 없어야 합니다. 실제 강사 PUT은 200이어야 합니다. 브라우저 확인법은 위 문서에 있습니다.
+4. `/aleph.json`의 step 8·최신 커밋·허용 경로 8개를 확인하고 제출 JSON을 사용합니다.
+
+**현재 실제 DB 적용·강사/엔진 사용자 연결·운영 A/B API 시험은 미실행입니다.** SQL은 로컬 PostgreSQL에서 실행했고 API는 검증된 가상 계정으로 시험했습니다. 이는 실제 설정/계정 시험을 대신하지 않습니다. 7단계 실제 재로그인 전후 자료 차단 및 보너스 IP의 운영 엔진 연결도 이전과 같이 미확인입니다.
 
 ## 7단계 입력 검사와 복합 이상 규칙
 
@@ -137,7 +163,7 @@ npm run decider:test
 
 ## 설정·추가점수 확인
 
-- `aleph.config.json.step`은 7이며 새 배포 `/aleph.json`에도 7을 기록합니다. 실제 최신 배포 반영은 위 순서로 확인합니다. 배포 스키마 `aleph.defense.deployment.v1`을 유지합니다.
+- `aleph.config.json.step`은 8이며 새 배포 `/aleph.json`에도 8을 기록합니다. 실제 최신 배포 반영은 위 순서로 확인합니다. 배포 스키마 `aleph.defense.deployment.v1`을 유지합니다.
 - `originalApiUrl`은 쿼리 없는 `https://eqkxsftptrmgacddkswd.supabase.co/rest/v1/notes`입니다.
 - `/aleph.json`에 위 다섯 `allowedRoutes`와 `originalApiUrl`도 빌드 시 자동 기록합니다.
 - 운영 측 `judgeIssuer`, 로그인 발급자 정보, 실제 앱 주소는 유지합니다.
@@ -156,7 +182,7 @@ npm run test:stage5
 
 `test:stage5`는 원래 로그인·소유자 API 테스트와 로컬 PGlite PostgreSQL SQL 테스트입니다. 4단계 GRANT/RLS를 거쳐 5단계 실제 회수 SQL을 적용하고 anon/authenticated 직접 CRUD 거부, 별도 열 권한 제거, 기존 서버 함수로 A/B CRUD 허용·타인/소유자 변경 거부, 자료·RLS·다른 테이블 보존, 재실행, 상속 권한이 남을 때 중단을 검사합니다. 시험 서명 키와 가상 계정은 프로세스 안에서만 사용합니다.
 
-현재 커밋 메시지는 **7단계 저장점**입니다. 저장점 뒤 실행합니다.
+현재 커밋 메시지는 **8단계 저장점**입니다. 저장점 뒤 실행합니다.
 
 ```bash
 npm run bundle
