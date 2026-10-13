@@ -126,13 +126,15 @@ test('generic note IDs stay allowed; list discovery metadata never grants policy
   for(const id of ['demo','note_fixture','note-42',N])for(const base of ['/notes','/api/notes'])for(const method of ['GET','PUT']){
     assert.equal((await decide({...normal,method,path:`${base}/${id}`,route:`${method} ${base}/:id`})).decision,'allow');
   }
-  assert.deepEqual(config.allowedRoutes,[{method:'GET',path:'/api/notes'},{method:'GET',path:'/api/notes/:id'},{method:'PUT',path:'/api/notes/:id'},
-    {method:'GET',path:'/api/announcements/:id'},{method:'GET',path:'/api/notices/:id'}]);
+  assert.deepEqual(config.allowedRoutes,['GET /api/notes','GET /api/notes/:id','PUT /api/notes/:id',
+    'GET /api/announcements/:id','GET /api/notices/:id']);
   for(const route of config.allowedRoutes){
-    const service=route.path.split('/')[2];
-    const out=await decide({...normal,service,method:route.method,path:route.path.replace(':id','fixture_resource'),route:`${route.method} ${route.path}`});
-    assert.equal(out.decision, route.path==='/api/notes' ? 'deny' : 'allow');
-    if(route.path==='/api/notes')assert.deepEqual(out.ruleIds,['zone_notes_no_bulk']);
+    assert.match(route,/^(GET|PUT) \/api\/[a-z]+(?:\/:id)?$/);
+    const [method,path]=route.split(' ');
+    const service=path.split('/')[2];
+    const out=await decide({...normal,service,method,path:path.replace(':id','fixture_resource'),route});
+    assert.equal(out.decision, path==='/api/notes' ? 'deny' : 'allow');
+    if(path==='/api/notes')assert.deepEqual(out.ruleIds,['zone_notes_no_bulk']);
   }
   const routing=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
   assert.ok(routing.rewrites.some(r=>r.source==='/api/announcements/:id' && r.destination==='/api/notices?id=:id'));
