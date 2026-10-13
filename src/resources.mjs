@@ -1,7 +1,9 @@
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const FEATURE_IDS = new Set(['export', 'import', 'download', 'backup', 'bulk', 'all', 'admin', 'search', 'dump', 'sync', 'list', 'users']);
 
 // Exact routes: IDs never share a slot with export/actions. Query has no operation selector.
-export function classifyResource(request, { fixtureDemo = false } = {}) {
+export function classifyResource(request) {
   for (const [collection, service, listMethods, itemMethods] of [
     ['notes', 'notes', ['GET', 'POST'], ['GET', 'PUT', 'DELETE']],
     ['notices', 'notices', ['GET'], ['GET', 'PUT']],
@@ -14,10 +16,9 @@ export function classifyResource(request, { fixtureDemo = false } = {}) {
       if (typeof request.path !== 'string' || !request.path.startsWith(`${base}/`)
           || request.route !== `${request.method} ${base}/:id` || !itemMethods.includes(request.method)) continue;
       const id = request.path.slice(base.length + 1);
-      if (UUID.test(id)) return { collection, id: id.toLowerCase(), resourceId: `${collection}:${id.toLowerCase()}` };
-      // The existing stage 6/7 exercise uses /notes/demo. Never enabled for live requests.
-      if (fixtureDemo && collection === 'notes' && id === 'demo' && request.method === 'GET') {
-        return { collection, id: 'demo', resourceId: 'notes:demo' };
+      if (RESOURCE_ID.test(id) && !FEATURE_IDS.has(id.toLowerCase())) {
+        const canonical = UUID.test(id) ? id.toLowerCase() : id;
+        return { collection, id: canonical, resourceId: `${collection}:${canonical}` };
       }
     }
   }

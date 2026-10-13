@@ -28,6 +28,13 @@ export function createResourceAuthorizer({ supabase, config: boundConfig }) {
 
 let serverAuthorizer;
 export async function authorizeServerResource(request, resource) {
+  if (['classId', 'projectId', 'subjectId'].some(key => typeof request[key] !== 'string' || !request[key])) return false;
+  // This exact API always applies owner_id = verified login ID in the final SELECT.
+  // No item ID or owner selector may be supplied through the query on this grant.
+  // Individual resources and engine-only collection paths still require ownership below.
+  if (resource.collection === 'notes' && resource.id === null && request.method === 'GET'
+      && request.path === '/api/notes' && request.route === 'GET /api/notes'
+      && request.queryLength === 0) return true;
   // Fixed class/project and subject aliases are ONLY for the existing local/judge exercise.
   // These aliases are never compared with actual Supabase users or used for a live class.
   if (request.signals?.source === 'judge_fixture' && request.classId === 'class_fixture' && request.projectId === 'project_fixture') {

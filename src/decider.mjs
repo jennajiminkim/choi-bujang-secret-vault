@@ -20,8 +20,7 @@ return async function decide(request) {
     return response('deny', 'device_not_registered', 'device_registered');
   }
 
-  const fixtureDemo = request.classId === 'class_fixture' && request.projectId === 'project_fixture';
-  const resource = classifyResource(request, { fixtureDemo });
+  const resource = classifyResource(request);
   if (resource) {
     const context = inspectAccessSignals(request);
     if (context.kind === 'invalid') {

@@ -110,6 +110,33 @@ test('API 재확인: 자기 메모 CRUD 유지, 타인 메모와 위조 role 직
   assert.equal((await request('notes','GET',[A])).code,400);
 });
 
+test('운영 사용자 본인 목록 읽기는 연결표 없이 허용하되 ID·소유자 쿼리와 타인 단건은 열지 않는다',async()=>{
+  const {normal}=fixtureRequests();
+  const ownList={...normal,classId:'another-class',projectId:'another-project',subjectId:'opaque-current-user',
+    path:'/api/notes',route:'GET /api/notes',
+    signals:{source:'none',region:'unknown',network:'unknown',hour:14}};
+  assert.equal((await decide(ownList)).decision,'allow');
+  assert.equal((await decide({...ownList,queryLength:40})).decision,'deny');
+  assert.equal((await decide({...ownList,subjectId:''})).decision,'deny');
+  assert.equal((await decide({...ownList,deviceRegistered:false})).reasonCode,'device_not_registered');
+  assert.equal((await decide({...ownList,signals:{source:'judge_fixture',region:'local',network:'unusual',hour:3},
+    recentEvents:[{kind:'risk_signal',ageSeconds:60,count:20}]})).decision,'step_up');
+  assert.equal((await decide({...ownList,path:`/api/notes/${A}`,route:'GET /api/notes/:id'})).decision,'deny');
+  assert.equal((await decide({...ownList,path:'/notes',route:'GET /notes'})).decision,'deny');
+});
+
+test('문자 ID도 소유권 확인 뒤 판정하고 UUID 형식이 아니라는 이유만으로 거부하지 않는다',async()=>{
+  const {normal}=fixtureRequests();
+  const request={...normal,classId:'test-class',projectId:'test-project',subjectId:'opaque-A',path:'/notes/note-one'};
+  const authorizer=async(input,resource)=>resource.id==='note-one' && input.subjectId==='opaque-A';
+  const policy=createResourceDecider({authorize:authorizer});
+  assert.equal(classifyResource(request)?.id,'note-one');
+  assert.equal((await policy(request)).decision,'allow');
+  assert.equal((await policy({...request,method:'PUT',route:'PUT /notes/:id'})).decision,'allow');
+  assert.equal((await policy({...request,subjectId:'opaque-B'})).decision,'deny');
+  assert.equal((await policy({...request,path:'/notes/export'})).decision,'deny');
+});
+
 test('공지 읽기와 서버 저장 강사 수정 허용; 갱신 순간 권한 회수도 대조한다',async()=>{
   const {request,db}=setup();
   const read=await request('notices','GET',N,undefined,authB);assert.equal(read.code,200);
