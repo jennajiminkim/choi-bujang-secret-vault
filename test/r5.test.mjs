@@ -26,7 +26,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
     step: 5,
     repoUrl: 'https://github.com/student-a/aleph-defense',
     commit: 'a'.repeat(40),
-    publicAppUrl: 'https://student-defense-123.vercel.app',
+    publicAppUrl: config.publicAppUrl,
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
     allowedRoutes: config.allowedRoutes,
@@ -34,6 +34,21 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   });
   assert.throws(() => deploymentIdentity({ ...env, VERCEL_GIT_PROVIDER: undefined }, config));
   assert.throws(() => deploymentIdentity({ ...env, VERCEL_GIT_COMMIT_SHA: 'short' }, config));
+});
+
+test('deployment advertises public app instead of protected deployment host; unsafe URLs reject', () => {
+  const result = deploymentIdentity(env, config);
+  assert.equal(result.publicAppUrl, config.publicAppUrl);
+  assert.notEqual(result.publicAppUrl, `https://${env.VERCEL_URL}`);
+  assert.equal(result.commit, env.VERCEL_GIT_COMMIT_SHA);
+  assert.deepEqual(result.allowedRoutes, config.allowedRoutes);
+  const legacy = {...config}; delete legacy.publicAppUrl;
+  assert.equal(deploymentIdentity(env, legacy).publicAppUrl, `https://${env.VERCEL_URL}`);
+  for (const publicAppUrl of ['http://student-defense.vercel.app', 'https://user:password@student-defense.vercel.app',
+    'https://student-defense.vercel.app/api/notes', 'https://student-defense.vercel.app?query=1',
+    'https://student-defense.vercel.app#fragment', 'https://student-defense.vercel.app:8443', null]) {
+    assert.throws(() => deploymentIdentity(env, {...config,publicAppUrl}));
+  }
 });
 
 test('stage 5 checks distinguish JSON denial from HTML and never record note bodies', async () => {
@@ -46,7 +61,7 @@ test('stage 5 checks distinguish JSON denial from HTML and never record note bod
       if (path === '/auth-config.json') return Response.json({ publishableKey: 'sb_publishable_fixture' });
       if (path === '/rest/v1/notes') return Response.json({ code: '42501', message: 'permission denied' }, { status: 401 });
       if (path === '/data.json') return Response.json({ notes: [] });
-      if (path === '/aleph.json') return Response.json({ schema: 'aleph.defense.deployment.v1', step: 5, allowedRoutes: config.allowedRoutes });
+      if (path === '/aleph.json') return Response.json({ schema: 'aleph.defense.deployment.v1', step: 5, publicAppUrl: config.publicAppUrl, allowedRoutes: config.allowedRoutes });
       if (path === '/') return new Response('<html></html>', { headers: { 'x-content-type-options': 'nosniff' } });
       return Response.json({ error: 'login required' }, { status: 401 });
     };

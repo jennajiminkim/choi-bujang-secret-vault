@@ -35,8 +35,8 @@ export async function runAttackChecks(config) {
     { headers: { Authorization: 'Bearer invalid' } }, denied);
   await check('static_notes_removed', '/data.json', '404 또는 정적 메모 0건', {}, (r, d) =>
     `HTTP ${r.status}; ${r.status === 404 ? '파일 없음' : Array.isArray(d?.notes) ? `정적 메모 ${d.notes.length}건` : '정적 JSON 형식 확인 실패'}`);
-  await check('deployment_identity', '/aleph.json', `JSON 배포 식별 정보 step ${config.step}`, {}, (r, d) =>
-    `HTTP ${r.status}; ${d?.schema === 'aleph.defense.deployment.v1' ? '배포 JSON 있음' : '배포 JSON 확인 실패'}; 단계 ${Number.isInteger(d?.step) ? d.step : '확인 실패'}; ${r.ok && d?.step === config.step ? '기대 결과 일치' : '기대 결과 불일치'}`);
+  await check('deployment_identity', '/aleph.json', `JSON 배포 식별 정보 step ${config.step}, publicAppUrl은 설정의 공개 주소와 일치`, {}, (r, d) =>
+    `HTTP ${r.status}; ${d?.schema === 'aleph.defense.deployment.v1' ? '배포 JSON 있음' : '배포 JSON 확인 실패'}; 단계 ${Number.isInteger(d?.step) ? d.step : '확인 실패'}; 공개 주소 일치 ${d?.publicAppUrl === app.origin ? '있음' : '없음'}; ${r.ok && d?.step === config.step && d?.publicAppUrl === app.origin ? '기대 결과 일치' : '기대 결과 불일치'}`);
   await check('security_header', '/', '첫 화면 X-Content-Type-Options: nosniff', {}, r =>
     `HTTP ${r.status}; nosniff ${r.headers.get('x-content-type-options')?.toLowerCase() === 'nosniff' ? '있음' : '없음'}`);
   await check('deployment_routes', '/aleph.json', 'allowedRoutes에 실제 자료 경로가 하나 이상 있음', {}, (r, d) =>

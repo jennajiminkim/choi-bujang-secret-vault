@@ -18,12 +18,23 @@ export function deploymentIdentity(env, config) {
       || !/^[A-Z0-9_]{1,80}$/u.test(config.sampleMarker)) {
     throw new Error('배포 식별 정보를 확인할 수 없습니다. Vercel 시스템 환경변수와 5~8단계 설정을 확인하세요.');
   }
+  // VERCEL_URL identifies an individual deployment, which may have an SSO wall.
+  // Advertise the configured public app URL used by the browser and JWT audience.
+  let publicApp;
+  try {
+    publicApp = new URL(config.publicAppUrl === undefined ? `https://${host}` : config.publicAppUrl);
+    if (publicApp.protocol !== 'https:' || !HOST.test(publicApp.hostname)
+        || publicApp.username || publicApp.password || publicApp.port
+        || publicApp.pathname !== '/' || publicApp.search || publicApp.hash) throw new Error();
+  } catch {
+    throw new Error('aleph.config.json의 publicAppUrl에 공개 자료실의 쿼리 없는 HTTPS 주소를 지정하세요.');
+  }
   return {
     schema: 'aleph.defense.deployment.v1',
     step: config.step,
     repoUrl: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}`,
     commit: commit.toLowerCase(),
-    publicAppUrl: `https://${host.toLowerCase()}`,
+    publicAppUrl: publicApp.origin,
     judgeIssuer: config.judgeIssuer,
     sampleMarker: config.sampleMarker,
     allowedRoutes: config.allowedRoutes,
