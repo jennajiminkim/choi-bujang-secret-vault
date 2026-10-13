@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-import config from '../aleph.config.json' with { type: 'json' };
 import { UUID } from './resources.mjs';
 
 export function createResourceAuthorizer({ supabase, config: boundConfig }) {
@@ -26,41 +24,32 @@ export function createResourceAuthorizer({ supabase, config: boundConfig }) {
   };
 }
 
-let serverAuthorizer;
-export async function authorizeServerResource(request, resource) {
+// A logical engine resource belongs to the subject namespace explicitly named in
+// its ID. This is OUR policy convention, not an undocumented engine guarantee.
+// Never claim a resource merely because its first request arrived from a subject.
+export function isOwnLogicalResource(subjectId, id) {
+  if (typeof subjectId !== 'string' || !subjectId || typeof id !== 'string') return false;
+  return id === subjectId || (id.startsWith(`${subjectId}--`) && id.length > subjectId.length + 2);
+}
+
+export function authorizeServerResource(request, resource) {
   if (['classId', 'projectId', 'subjectId'].some(key => typeof request[key] !== 'string' || !request[key])) return false;
-  // This exact API always applies owner_id = verified login ID in the final SELECT.
-  // No item ID or owner selector may be supplied through the query on this grant.
-  // Individual resources and engine-only collection paths still require ownership below.
-  if (resource.collection === 'notes' && resource.id === null && request.method === 'GET'
-      && request.path === '/api/notes' && request.route === 'GET /api/notes'
-      && request.queryLength === 0) return true;
-  // Fixed class/project and subject aliases are ONLY for the existing local/judge exercise.
-  // These aliases are never compared with actual Supabase users or used for a live class.
-  if (request.signals?.source === 'judge_fixture' && request.classId === 'class_fixture' && request.projectId === 'project_fixture') {
-    const subjects = ['learner_fixture', 'learner_b_fixture', 'instructor_fixture'];
-    if (!subjects.includes(request.subjectId)) return false;
-    if (resource.id === 'demo') return request.subjectId === 'learner_fixture' && request.method === 'GET';
-    if (resource.collection === 'notes') {
-      if (!resource.id) return true;
-      const owner = { '11111111-1111-4111-8111-111111111111': 'learner_fixture',
-        '22222222-2222-4222-8222-222222222222': 'learner_b_fixture' }[resource.id];
-      return owner === request.subjectId;
+  if (request.queryLength !== 0) return false; // No unseen query may select an ID, owner or operation.
+  if (resource.collection === 'notes') {
+    if (request.path === '/api/notes' && resource.id === null) {
+      return ['GET', 'POST'].includes(request.method);
     }
-    if (resource.id && resource.id !== '33333333-3333-4333-8333-333333333333') return false;
-    return request.method === 'GET' || request.subjectId === 'instructor_fixture';
+    if (request.path.startsWith('/api/notes/')) {
+      // Grant entry to this exact owned-resource handler, NOT proof of row ownership.
+      // Its final GET/PUT/DELETE always uses id AND owner_id = verified login ID.
+      // Other users' rows are 404 regardless of this entry grant.
+      return UUID.test(resource.id ?? '') && ['GET', 'PUT', 'DELETE'].includes(request.method);
+    }
+    // Bare engine collection /notes and ownerless opaque IDs have no ownership evidence.
+    return ['GET', 'PUT'].includes(request.method) && isOwnLogicalResource(request.subjectId, resource.id);
   }
-  try {
-    if (!serverAuthorizer) {
-      const url = process.env.SUPABASE_URL;
-      const secret = process.env.SUPABASE_SECRET_KEY;
-      if (!url || !secret || new URL(url).origin !== new URL(config.identityProvider.issuer).origin) return false;
-      const supabase = createClient(url, secret, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        global: { fetch: (target, options) => fetch(target, { ...options, signal: AbortSignal.timeout(1200) }) },
-      });
-      serverAuthorizer = createResourceAuthorizer({ supabase, config });
-    }
-    return await serverAuthorizer(request, resource);
-  } catch { return false; }
+  // Readable notice zone; the final API authenticates the reader again.
+  // No verified instructor role exists in the public engine request contract.
+  // Instructor writes need an explicitly provided trusted grant, otherwise deny.
+  return resource.collection === 'notices' && request.method === 'GET';
 }

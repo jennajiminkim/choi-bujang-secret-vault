@@ -4,6 +4,7 @@ const FEATURE_IDS = new Set(['export', 'import', 'download', 'backup', 'bulk', '
 
 // Exact routes: IDs never share a slot with export/actions. Query has no operation selector.
 export function classifyResource(request) {
+  if (request?.queryLength !== 0) return null;
   for (const [collection, service, listMethods, itemMethods] of [
     ['notes', 'notes', ['GET', 'POST'], ['GET', 'PUT', 'DELETE']],
     ['notices', 'notices', ['GET'], ['GET', 'PUT']],

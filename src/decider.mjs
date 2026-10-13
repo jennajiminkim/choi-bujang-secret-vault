@@ -1,5 +1,5 @@
 // ALEPH SDP 엔진이 신원·기기·경로를 확인한 요청만 받습니다.
-// 등록 기기·추가 확인·서버 저장 자원 권한을 모두 통과해야 허용합니다.
+// 등록 기기·추가 확인·자원 구역을 검사하고 실제 API는 소유권을 다시 확인합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 import { inspectAccessSignals } from './access-signals.mjs';
 import { classifyResource } from './resources.mjs';
@@ -47,7 +47,7 @@ return async function decide(request) {
       }
     }
     // source:none is unavailable, not a fabricated normal risk profile.
-    // Device and server resource grants still apply without inventing a normal risk profile.
+    // Device and resource-zone grants still apply without inventing a normal risk profile.
     return { ...response('allow', 'approved', 'device_registered'), ruleIds: ['device_registered', 'resource_zones'] };
   }
   return {

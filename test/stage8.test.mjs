@@ -64,13 +64,13 @@ function setup() {
 
 test('구역 판정은 A의 읽기·수정 허용, B의 A 접근과 일반 학생 공지 수정 거부',async()=>{
   const {normal}=fixtureRequests();
-  const note={...normal,path:`/notes/${A}`,route:'GET /notes/:id'};
+  const note={...normal,path:`/notes/${normal.subjectId}--note`,route:'GET /notes/:id'};
   assert.equal((await decide(note)).decision,'allow');
   assert.equal((await decide({...note,method:'PUT',route:'PUT /notes/:id'})).decision,'allow');
   assert.equal((await decide({...note,subjectId:'learner_b_fixture'})).decision,'deny');
   const notice={...normal,service:'notices',path:`/notices/${N}`,method:'PUT',route:'PUT /notices/:id'};
   assert.equal((await decide(notice)).decision,'deny');
-  assert.equal((await decide({...notice,subjectId:'instructor_fixture'})).decision,'allow');
+  assert.equal((await decide({...notice,subjectId:'instructor_fixture'})).decision,'deny'); // A name cannot establish an instructor grant.
   assert.equal((await decide({...note,deviceRegistered:false})).reasonCode,'device_not_registered');
 });
 
@@ -110,7 +110,7 @@ test('API 재확인: 자기 메모 CRUD 유지, 타인 메모와 위조 role 직
   assert.equal((await request('notes','GET',[A])).code,400);
 });
 
-test('운영 사용자 본인 목록 읽기는 연결표 없이 허용하되 ID·소유자 쿼리와 타인 단건은 열지 않는다',async()=>{
+test('실제 API의 본인 목록·단건 진입은 연결표 없이 허용하고 쿼리 우회는 거부한다',async()=>{
   const {normal}=fixtureRequests();
   const ownList={...normal,classId:'another-class',projectId:'another-project',subjectId:'opaque-current-user',
     path:'/api/notes',route:'GET /api/notes',
@@ -121,7 +121,7 @@ test('운영 사용자 본인 목록 읽기는 연결표 없이 허용하되 ID�
   assert.equal((await decide({...ownList,deviceRegistered:false})).reasonCode,'device_not_registered');
   assert.equal((await decide({...ownList,signals:{source:'judge_fixture',region:'local',network:'unusual',hour:3},
     recentEvents:[{kind:'risk_signal',ageSeconds:60,count:20}]})).decision,'step_up');
-  assert.equal((await decide({...ownList,path:`/api/notes/${A}`,route:'GET /api/notes/:id'})).decision,'deny');
+  assert.equal((await decide({...ownList,path:`/api/notes/${A}`,route:'GET /api/notes/:id'})).decision,'allow');
   assert.equal((await decide({...ownList,path:'/notes',route:'GET /notes'})).decision,'deny');
 });
 
@@ -135,6 +135,42 @@ test('문자 ID도 소유권 확인 뒤 판정하고 UUID 형식이 아니라는
   assert.equal((await policy({...request,method:'PUT',route:'PUT /notes/:id'})).decision,'allow');
   assert.equal((await policy({...request,subjectId:'opaque-B'})).decision,'deny');
   assert.equal((await policy({...request,path:'/notes/export'})).decision,'deny');
+});
+
+test('주체별 논리 자원은 반·프로젝트 하드코딩과 최초 요청 순서 없이 본인만 허용한다',async()=>{
+  const {normal}=fixtureRequests();
+  for(const source of ['none','judge_fixture']) {
+    const input={...normal,classId:'independent-class',projectId:'independent-project',subjectId:'owner_alpha',
+      path:'/notes/owner_alpha--memo',signals:source==='none'
+        ? {source,region:'unknown',network:'unknown',hour:14} : {...normal.signals,source}};
+    // The attacker arrives first: no ownership may be acquired by visiting the ID.
+    assert.equal((await decide({...input,subjectId:'owner_beta'})).decision,'deny');
+    assert.equal((await decide(input)).decision,'allow');
+    assert.equal((await decide({...input,method:'PUT',route:'PUT /notes/:id'})).decision,'allow');
+    assert.equal((await decide({...input,subjectId:'owner_alph'})).decision,'deny');
+    assert.equal((await decide({...input,subjectId:'OWNER_ALPHA'})).decision,'deny');
+    assert.equal((await decide({...input,path:'/notes/unassigned-memo'})).decision,'deny');
+    assert.equal((await decide({...input,path:`/api/notes/${A}`,queryLength:10,route:'GET /api/notes/:id'})).decision,'deny');
+  }
+});
+
+test('판정기 API 진입 허용 뒤 최종 API는 본인 단건 200, B의 A 메모 404를 보장한다',async()=>{
+  const {normal}=fixtureRequests();
+  const {request,db}=setup();
+  db.tables.vault_subject_links=[]; // No operator mapping: neither path may depend on it.
+  const input={...normal,classId:'independent-class',projectId:'independent-project',subjectId:'opaque-A',
+    path:`/api/notes/${A}`,route:'GET /api/notes/:id',signals:{source:'none',region:'unknown',network:'unknown',hour:14}};
+  for(const method of ['GET','PUT','DELETE']) {
+    const entry={...input,method,route:`${method} /api/notes/:id`};
+    assert.equal((await decide(entry)).decision,'allow');
+    // Entry is permission to invoke the owner-filtered API, not permission to receive the row.
+    assert.equal((await decide({...entry,subjectId:'opaque-B'})).decision,'allow');
+    const denied=await request('notes',method,A,{title:'blocked',body:'fixture'},authB);
+    assert.equal(denied.code,404);assert.deepEqual(Object.keys(denied.body),['error']);
+  }
+  assert.equal((await request('notes','GET',A)).code,200);
+  assert.equal(db.tables.notes[0].title,'fixture');
+  assert.equal((await request('notes','PUT',A,{title:'edited',body:'fixture'})).code,200);
 });
 
 test('공지 읽기와 서버 저장 강사 수정 허용; 갱신 순간 권한 회수도 대조한다',async()=>{

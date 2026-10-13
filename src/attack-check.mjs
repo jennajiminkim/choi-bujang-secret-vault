@@ -61,14 +61,15 @@ export async function runAttackChecks(config) {
   if (config.step === 8) {
     await check('anonymous_notice_update', `/api/notices/${dummy}`, '공지 수정도 무로그인 401/403 JSON 거부', { method: 'PUT' }, denied);
     const { normal, suspicious } = fixtureRequests();
-    const own = { ...normal, path: '/notes/11111111-1111-4111-8111-111111111111', route: 'GET /notes/:id' };
+    const own = { ...normal, path: `/notes/${normal.subjectId}--memo`, route: 'GET /notes/:id' };
     const ownList = { ...normal, classId: 'practice_class', projectId: 'practice_project', subjectId: 'practice_subject',
       path: '/api/notes', route: 'GET /api/notes', signals: { source: 'none', region: 'unknown', network: 'unknown', hour: 14 } };
+    const ownApiItem = { ...ownList, path: '/api/notes/11111111-1111-4111-8111-111111111111', route: 'GET /api/notes/:id' };
     const notice = { ...normal, service: 'notices', method: 'PUT', path: '/notices/33333333-3333-4333-8333-333333333333', route: 'PUT /notices/:id' };
     for (const [attackId, inputs, expected] of [
-      ['local_own_note_zone', [own, { ...own, method: 'PUT', route: 'PUT /notes/:id' }, ownList], ['allow', 'allow', 'allow']],
+      ['local_own_note_zone', [own, { ...own, method: 'PUT', route: 'PUT /notes/:id' }, ownList, ownApiItem], ['allow', 'allow', 'allow', 'allow']],
       ['local_other_note_zone', [{ ...own, subjectId: 'learner_b_fixture' }], ['deny']],
-      ['local_notice_zone', [notice, { ...notice, subjectId: 'instructor_fixture' }], ['deny', 'allow']],
+      ['local_notice_zone', [notice, { ...notice, subjectId: 'instructor_fixture' }], ['deny', 'deny']],
       ['local_prior_rules', [normal, { ...normal, deviceRegistered: false }, suspicious], ['allow', 'deny', 'step_up']],
     ]) {
       const decisions = [];
@@ -77,7 +78,7 @@ export async function runAttackChecks(config) {
         observed: `로컬 가상 구역 판정: ${decisions.join(', ')}; ${JSON.stringify(decisions) === JSON.stringify(expected) ? '일치' : '불일치'}; 실제 계정 API 시험 아님` });
     }
     results.push({ attackId: 'live_resource_authorization', expected: '실제 사용자 연결·강사 설정 뒤 A 본인 허용, B의 A 자료 및 일반 학생 공지 수정 거부',
-      observed: '미실행: 사용자는 가상 공지 추가와 강사 권한 표가 비어 있음을 보고했습니다. 실제 엔진 사용자 연결과 운영 A/B·강사 API 시험은 확인되지 않았습니다.' });
+      observed: '미실행: 가상 공지 추가와 빈 강사 표는 사용자 보고입니다. 실제 운영 A/B·강사 API 시험 및 심판 논리 자원 ID와 우리 구역 규약의 일치는 확인되지 않았습니다.' });
   } else if (config.step >= 6) {
     const { normal, suspicious } = fixtureRequests();
     for (const [attackId, request, expected, reason] of [
