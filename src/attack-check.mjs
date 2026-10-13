@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6].includes(config.step)) throw new Error('현재 자기 점검은 5~6단계에 맞춰져 있습니다.');
+  if (![5, 6, 7].includes(config.step)) throw new Error('현재 자기 점검은 5~7단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -58,8 +58,8 @@ export async function runAttackChecks(config) {
     observed: '미실행: 권한 회수 전후 실제 A/B 계정 CRUD 시험은 사용자 확인이 필요합니다. 이전 단계의 A CRUD 확인은 5단계 시험을 대신하지 않습니다.' });
   results.push({ attackId: 'live_direct_grants', expected: '실제 학습 DB에서 PUBLIC·anon·authenticated 직접 권한 없음, 서버 CRUD 유지',
     observed: '미실행: 5단계 권한 회수 SQL은 검토용으로 제공했습니다. 직접 anon 거부 결과만으로 authenticated 권한 회수를 증명하지 않습니다.' });
-  if (config.step === 6) {
-    const { normal } = fixtureRequests();
+  if (config.step >= 6) {
+    const { normal, suspicious } = fixtureRequests();
     for (const [attackId, request, expected, reason] of [
       ['local_registered_device', normal, 'allow', 'approved'],
       ['local_unregistered_device', { ...normal, deviceRegistered: false }, 'deny', 'device_not_registered'],
@@ -69,8 +69,21 @@ export async function runAttackChecks(config) {
       results.push({ attackId, expected: `로컬 가상 요청: ${expected} · ${reason}`,
         observed: `로컬 가상 요청: ${result.decision} · ${result.reasonCode}; ${result.decision === expected && result.reasonCode === reason ? '일치' : '불일치'}; 심판 또는 실제 기기 접속 시험 아님` });
     }
-    results.push({ attackId: 'live_registered_device', expected: '운영 엔진을 통한 등록 기기의 기존 화면·자료 읽기',
-      observed: '미실행: 등록 기기의 실제 화면 확인은 사용자 확인이 필요합니다. 미등록 기기 공격은 심판이 수행합니다.' });
+    if (config.step === 7) {
+      for (const [attackId, input, expected] of [
+        ['local_compound_step_up', suspicious, 'step_up'],
+        ['local_rechecked_fixture', { ...suspicious, stepUp: { verified: true, authAgeSeconds: 60 } }, 'allow'],
+      ]) {
+        const output = await decide(input);
+        results.push({ attackId, expected: `로컬 가상 요청: ${expected}`,
+          observed: `로컬 가상 요청: ${output.decision} · ${output.reasonCode}; ${output.decision === expected ? '일치' : '불일치'}; 실제 로그인·자료 차단 시험 아님` });
+      }
+      results.push({ attackId: 'live_step_up_flow', expected: '운영 엔진에서 같은 주체의 새 로그인 검증 전 자료 없음, 재검증 후 새 요청 허용',
+        observed: '미실행: stepUp 요약 계약은 있으나 실제 새 로그인·확인 요청 연결은 저장소에서 확인되지 않아 운영 자료 차단과 해제는 시험하지 않았습니다.' });
+    } else {
+      results.push({ attackId: 'live_registered_device', expected: '운영 엔진을 통한 등록 기기의 기존 화면·자료 읽기',
+        observed: '미실행: 등록 기기의 실제 화면 확인은 사용자 확인이 필요합니다. 미등록 기기 공격은 심판이 수행합니다.' });
+    }
   }
   return results;
 }
