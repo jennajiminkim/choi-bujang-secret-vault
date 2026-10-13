@@ -70,15 +70,19 @@ export async function runAttackChecks(config) {
       [{...normal,path:`/api/notes/${dummy}`,route:'GET /api/notes/:id'}, 'allow'],
       [{...normal,method:'PUT',path:`/api/notes/${dummy}`,route:'PUT /api/notes/:id'}, 'allow'],
       [{...normal,path:'/notes/export'},'deny'],
+      [{...normal,path:'/notes',route:'GET /notes'},'deny'],
+      [{...normal,path:'/api/notes',route:'GET /api/notes'},'deny'],
+      [{...normal,service:'notices',path:`/notices/${dummy}`,route:'GET /notices/:id'},'deny'],
       [{...normal,service:'notices',method:'PUT',path:`/notices/${dummy}`,route:'PUT /notices/:id'},'deny'],
     ];
     const pathResults = await Promise.all(paths.map(async ([input,expected]) => (await decide(input)).decision === expected));
-    results.push({attackId:'local_resource_routes',expected:'로컬 메모 API 진입 허용, 기능 경로·미확인 강사 쓰기 거부',
-      observed:`로컬 ${pathResults.filter(Boolean).length}/4 일치; API 진입 허용은 소유권 증명 아님`});
+    results.push({attackId:'local_resource_routes',expected:'로컬 개별 GET·PUT 허용; 메모 목록·기능 경로·공지 거부',
+      observed:`로컬 ${pathResults.filter(Boolean).length}/${paths.length} 일치; API 진입 허용은 소유권 증명 아님`});
     results.push({attackId:'live_instructor_update',expected:'승인된 강사만 공지 수정, 학생은 403',
       observed:'미실행: 실제 학습 DB의 강사 설정 및 학생/강사 인증 요청은 사용자 확인이 필요합니다. 로컬 API·SQL 시험과 구분합니다.'});
-    results.push({attackId:'engine_owner_contract',expected:'판정기가 엔진 검증 소유자와 강사 권한을 받아 구역별 판단',
-      observed:'미구현: 현재 18개 입력 계약에 소유자·강사 권한이 없습니다. 임의 연결표를 만들지 않고 최종 API에서 검증된 사용자와 DB 소유자를 대조합니다.'});
+    const bulk = await decide({...normal,path:'/notes',route:'GET /notes'});
+    results.push({attackId:'local_bulk_denial',expected:'로컬 GET /notes는 deny · zone_notes_no_bulk',
+      observed:`로컬 ${bulk.decision}; 규칙 ${bulk.ruleIds.join(',')}; ${bulk.decision==='deny' && bulk.ruleIds.includes('zone_notes_no_bulk')?'일치':'불일치'}; 소유자 비교는 최종 API가 수행`});
     results.push({attackId:'live_step_up_flow',expected:'운영 엔진에서 새 로그인 검증 전 자료 차단, 재검증 후 요청 허용',
       observed:'미실행: 실제 재로그인·확인 요청 연결 계약이 없어 로컬 가상 사건만 시험했습니다.'});
     return results;

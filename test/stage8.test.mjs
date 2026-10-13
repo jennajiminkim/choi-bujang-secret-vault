@@ -43,10 +43,10 @@ test('resource IDs separate notes and notices, including the same UUID',()=>{
   assert.equal(apiResourceId('notes',undefined),'notes:collection');
 });
 test('old normal fixture and arbitrary engine identities keep working; no DB link dependency',async()=>{
-  const {normal}=fixtureRequests();assert.ok(RULE_IDS.includes('resource_routes'));
+  const {normal}=fixtureRequests();assert.ok(RULE_IDS.includes('zone_notes_self'));
   for(const subjectId of ['learner_fixture','opaque-engine-subject']){
     assert.equal((await decide({...normal,subjectId})).decision,'allow');
-    for(const method of ['GET','PUT','DELETE']){
+    for(const method of ['GET','PUT']){
       assert.equal((await decide({...normal,subjectId,method,path:`/api/notes/${N}`,route:`${method} /api/notes/:id`})).decision,'allow');
     }
   }
@@ -59,16 +59,49 @@ test('unknown/function/encoded/traversal/route mismatch and student notice write
   }
   assert.equal((await decide({...normal,subjectId:''})).decision,'deny');
   assert.equal((await decide({...normal,method:'PUT',service:'notices',path:`/notices/${N}`,route:'PUT /notices/:id'})).decision,'deny');
-  assert.equal((await decide({...normal,service:'notices',path:`/notices/${N}`,route:'GET /notices/:id'})).decision,'allow');
+  assert.equal((await decide({...normal,service:'notices',path:`/notices/${N}`,route:'GET /notices/:id'})).decision,'deny');
 });
 test('device and compound-risk rules also precede new write/read routes',async()=>{
   const {normal,suspicious}=fixtureRequests();
-  for(const [service,method,path,route] of [['notes','PUT',`/api/notes/${N}`,'PUT /api/notes/:id'],['notices','GET',`/notices/${N}`,'GET /notices/:id']]){
+  for(const [service,method,path,route] of [['notes','PUT',`/api/notes/${N}`,'PUT /api/notes/:id'],['notes','GET',`/notes/${N}`,'GET /notes/:id']]){
     const routeFields={service,method,path,route};
     assert.equal((await decide({...normal,...routeFields,deviceRegistered:false})).reasonCode,'device_not_registered');
     assert.equal((await decide({...suspicious,...routeFields})).decision,'step_up');
     assert.equal((await decide({...suspicious,...routeFields,stepUp:{verified:true,authAgeSeconds:60}})).decision,'allow');
   }
+});
+test('policy denies every collection/function route and all notice/instructor operations',async()=>{
+  const {normal}=fixtureRequests();
+  for(const base of ['/notes','/api/notes']) {
+    for(const method of ['GET','POST','PUT','PATCH','DELETE']) {
+      assert.equal((await decide({...normal,method,path:base,route:`${method} ${base}`})).decision,'deny');
+    }
+    for(const id of ['all','export','import','bulk','search','admin','ALL']) {
+      assert.equal((await decide({...normal,path:`${base}/${id}`,route:`GET ${base}/:id`})).decision,'deny');
+    }
+    for(const method of ['POST','PATCH','DELETE']) {
+      assert.equal((await decide({...normal,method,path:`${base}/${N}`,route:`${method} ${base}/:id`})).decision,'deny');
+    }
+  }
+  for(const zone of ['notices','instructors','materials','announcements']) {
+    for(const base of [`/${zone}`,`/api/${zone}`]) {
+      for(const method of ['GET','POST','PUT','PATCH','DELETE']) {
+        for(const id of ['',`/${N}`]) {
+          const input={...normal,service:zone,method,path:base+id,route:`${method} ${base}${id?'/:id':''}`};
+          assert.equal((await decide(input)).decision,'deny');
+          // Neither a notes service alias nor a simulated recheck can open this zone.
+          assert.equal((await decide({...input,service:'notes',stepUp:{verified:true,authAgeSeconds:60}})).decision,'deny');
+        }
+      }
+    }
+  }
+});
+test('policy denies query-bearing or mismatched requests without inferring a query function',async()=>{
+  const {normal}=fixtureRequests();
+  for(const queryLength of [1,-1,'0',undefined])assert.equal((await decide({...normal,queryLength})).decision,'deny');
+  assert.equal((await decide({...normal,querySha256:'0'.repeat(64)})).decision,'deny');
+  assert.equal((await decide({...normal,path:'/notes/demo?id=other'})).decision,'deny');
+  assert.equal((await decide({...normal,route:'PUT /notes/:id'})).decision,'deny');
 });
 test('anonymous/invalid notices requests deny before database access',async()=>{
   const {db,request}=setup();

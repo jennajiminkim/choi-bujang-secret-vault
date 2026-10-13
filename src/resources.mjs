@@ -6,21 +6,20 @@ export function apiResourceId(zone, id) {
   if (!['notes', 'notices'].includes(zone)) throw new Error('Unknown resource zone');
   return id === undefined ? `${zone}:collection` : UUID.test(id ?? '') ? `${zone}:${id.toLowerCase()}` : `${zone}:invalid`;
 }
+// Policy admits one note only. Final API checks its stored owner atomically.
+// Collection APIs still serve the browser, but are never admitted by this policy.
 export function matchResource(request) {
-  if (typeof request?.subjectId !== 'string' || !request.subjectId.trim()) return null;
-  for (const zone of ['notes', 'notices']) {
-    if (request.service !== zone) continue;
-    for (const base of [`/${zone}`, `/api/${zone}`]) {
-      if (request.path === base && request.route === `${request.method} ${base}`) {
-        const allowed = zone === 'notes' ? ['GET', 'POST'] : ['GET'];
-        if (allowed.includes(request.method)) return {zone, id: null, resourceId: `${zone}:collection`};
-      }
-      if (typeof request.path !== 'string' || !request.path.startsWith(`${base}/`)
-          || request.route !== `${request.method} ${base}/:id`) continue;
-      const id = request.path.slice(base.length + 1);
-      if (!ID.test(id) || functions.has(id.toLowerCase())) continue;
-      const allowed = zone === 'notes' ? ['GET', 'PUT', 'DELETE'] : ['GET'];
-      if (allowed.includes(request.method)) return {zone, id, resourceId: `${zone}:${id}`};
+  if (typeof request?.subjectId !== 'string' || !request.subjectId.trim()
+      || request.service !== 'notes' || !['GET', 'PUT'].includes(request.method)
+      || request.queryLength !== 0
+      || request.querySha256 !== 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+      || typeof request.path !== 'string') return null;
+  for (const base of ['/notes', '/api/notes']) {
+    if (!request.path.startsWith(`${base}/`)
+        || request.route !== `${request.method} ${base}/:id`) continue;
+    const id = request.path.slice(base.length + 1);
+    if (ID.test(id) && !functions.has(id.toLowerCase())) {
+      return {zone: 'notes', id, resourceId: `notes:${id}`};
     }
   }
   return null;

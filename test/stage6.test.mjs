@@ -22,13 +22,13 @@ test('등록값이 정확한 true일 때만 읽기 허용; 누락·거짓·문�
   assert.equal((await decide(missing)).reasonCode, 'device_not_registered');
 });
 
-test('자료 서비스의 GET 경로만 허용하고 쓰기·다른 서비스·경로 불일치는 기존 거부', async () => {
+test('개별 정상 읽기를 유지하고 목록·다른 서비스·경로 불일치는 거부', async () => {
   const { normal } = fixtureRequests();
   for (const base of ['/notes','/api/notes']) {
-    for (const request of [{ ...normal, path: base, route: `GET ${base}` },
-      { ...normal, path: `${base}/demo`, route: `GET ${base}/:id` }]) {
-      assert.equal((await decide(request)).decision, 'allow');
-    }
+    assert.equal((await decide({ ...normal, path: `${base}/demo`, route: `GET ${base}/:id` })).decision, 'allow');
+    const list = await decide({ ...normal, path: base, route: `GET ${base}` });
+    assert.equal(list.decision, 'deny');
+    assert.deepEqual(list.ruleIds, ['zone_notes_no_bulk']);
   }
   for (const change of [{method:'POST'},{method:'PUT'},{method:'DELETE'},{service:'other'},
     {path:'/admin'},{route:'GET /admin'},{path:'/notes/../admin'}, {path:'/notes/..'}]) {

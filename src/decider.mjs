@@ -4,7 +4,7 @@
 import { matchResource } from './resources.mjs';
 import { inspectAccessSignals } from './access-signals.mjs';
 
-export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required', 'resource_routes']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required', 'zone_notes_self', 'zone_notes_no_bulk']);
 
 export async function decide(request) {
   const response = (decision, reasonCode, ruleId) => ({
@@ -18,6 +18,10 @@ export async function decide(request) {
     return response('deny', 'device_not_registered', 'device_registered');
   }
 
+  // A policy decision cannot assume a collection contains only the caller's notes.
+  if (request.service === 'notes' && ['/notes', '/api/notes'].includes(request.path)) {
+    return response('deny', 'starter_not_ready', 'zone_notes_no_bulk');
+  }
   const resource = matchResource(request);
   if (resource) {
     const context = inspectAccessSignals(request);
@@ -36,12 +40,13 @@ export async function decide(request) {
           return response('step_up', 'step_up_required', 'step_up_required');
         }
         return { ...response('allow', 'approved', 'device_registered'),
-          ruleIds: ['device_registered', 'step_up_required'] };
+          ruleIds: ['device_registered', 'zone_notes_self', 'step_up_required'] };
       }
     }
     // source:none is unavailable, not a fabricated normal risk profile.
     // Device and exact route checks still apply; final API checks stored ownership.
-    return response('allow', 'approved', request.method === 'GET' && resource.zone === 'notes' ? 'device_registered' : 'resource_routes');
+    return { ...response('allow', 'approved', 'zone_notes_self'),
+      ruleIds: ['device_registered', 'zone_notes_self'] };
   }
   return {
     schema: 'aleph.decision.v1',

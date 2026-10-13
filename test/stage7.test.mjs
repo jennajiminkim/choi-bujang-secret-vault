@@ -45,7 +45,7 @@ test('미등록 거부와 경로 범위는 유지하고 불명확한 입력은 �
   assert.equal((await decide({...normal,headers:{'x-network':'usual'}})).decision,'step_up');
   assert.equal((await decide({...normal,signals:undefined})).decision,'step_up');
   const unavailable={...normal,signals:{source:'none',region:'unknown',network:'unknown',hour:14}};
-  assert.deepEqual((await decide(unavailable)).ruleIds,['device_registered']);
+  assert.deepEqual((await decide(unavailable)).ruleIds,['device_registered','zone_notes_self']);
   assert.equal((await decide({...suspicious,recentEvents:[{kind:'risk_signal',count:'20',ageSeconds:60}]})).decision,'step_up');
 });
 
