@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8].includes(config.step)) throw new Error('현재 자기 점검은 5~8단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8, 9].includes(config.step)) throw new Error('현재 자기 점검은 5~9단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -58,7 +58,7 @@ export async function runAttackChecks(config) {
     observed: '미실행: 권한 회수 전후 실제 A/B 계정 CRUD 시험은 사용자 확인이 필요합니다. 이전 단계의 A CRUD 확인은 5단계 시험을 대신하지 않습니다.' });
   results.push({ attackId: 'live_direct_grants', expected: '실제 학습 DB에서 PUBLIC·anon·authenticated 직접 권한 없음, 서버 CRUD 유지',
     observed: '미실행: 5단계 권한 회수 SQL은 검토용으로 제공했습니다. 직접 anon 거부 결과만으로 authenticated 권한 회수를 증명하지 않습니다.' });
-  if (config.step === 8) {
+  if (config.step >= 8) {
     await check('anonymous_announcements', `/api/announcements/${dummy}`, '로그인 없이 공지 개별 API 요청은 401 또는 403 JSON 오류', {method:'GET'}, denied);
     const {normal, suspicious} = fixtureRequests();
     const priorCases = [[normal, 'allow'], [{...normal, deviceRegistered:false}, 'deny'],
@@ -90,6 +90,17 @@ export async function runAttackChecks(config) {
       observed:`로컬 ${bulk.decision}; 규칙 ${bulk.ruleIds.join(',')}; ${bulk.decision==='deny' && bulk.ruleIds.includes('zone_notes_no_bulk')?'일치':'불일치'}; 소유자 비교는 최종 API가 수행`});
     results.push({attackId:'live_step_up_flow',expected:'운영 엔진에서 새 로그인 검증 전 자료 차단, 재검증 후 요청 허용',
       observed:'미실행: 실제 재로그인·확인 요청 연결 계약이 없어 로컬 가상 사건만 시험했습니다.'});
+    if (config.step === 9) {
+      const { checkDetection } = await import('../scripts/detect-test.mjs');
+      const { detect } = await import('./detect.mjs');
+      const checks = await checkDetection(detect);
+      results[results.findIndex(item => item.attackId === 'local_bulk_denial')] = {
+        attackId:'local_detection_practice', expected:'기존 로컬 탐지 연습 6건 통과',
+        observed:`로컬 ${checks.filter(item => item.passed).length}/6 통과; 실제 회수·시간 측정은 미실행` };
+      results[results.findIndex(item => item.attackId === 'live_step_up_flow')] = {
+        attackId:'live_device_revocation', expected:'심판의 복합 의심 기기 한 개 회수·정상 기기 유지 및 경과 시간 측정',
+        observed:'미실행: 학생 함수는 회수 제안만 반환하며 실제 집행·시간 측정은 심판이 수행합니다.' };
+    }
     return results;
   }
   if (config.step >= 6) {
