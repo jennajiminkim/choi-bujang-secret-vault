@@ -1,3 +1,4 @@
+import { createDeviceGate } from '../src/device-approval.mjs';
 import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with { type: 'json' };
 import { createNoticesHandler } from '../src/notices-api.mjs';
@@ -14,7 +15,7 @@ export default async function notices(req, res) {
         return res.status(503).json({ error: '서버의 데이터베이스 설정을 확인해 주세요.' });
       }
       const supabase = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
-      handler = createNoticesHandler({ config, supabase });
+      handler = createNoticesHandler({ config, supabase, deviceGate:createDeviceGate({supabase}) });
     }
     return await handler(req, res);
   } catch { return res.status(503).json({ error: '공지 서버에 연결할 수 없습니다.' }); }

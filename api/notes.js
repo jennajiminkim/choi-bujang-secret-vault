@@ -1,3 +1,4 @@
+import { createDeviceGate } from '../src/device-approval.mjs';
 import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with { type: 'json' };
 import { createNotesHandler } from '../src/notes-api.mjs';
@@ -18,7 +19,7 @@ export default async function notes(req, res) {
       const supabase = createClient(url, secret, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       });
-      handler = createNotesHandler({ config, supabase });
+      handler = createNotesHandler({ config, supabase, deviceGate:createDeviceGate({supabase}) });
     }
     return await handler(req, res);
   } catch {
