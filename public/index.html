@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 자료 요청을 서버 한곳으로 모읍니다</title>
+  <title>BYTE BACK | 나만의 접속 앱</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#101a28">
+  <link rel="icon" href="/app-icon.svg" type="image/svg+xml">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     * { box-sizing: border-box; } [hidden] { display: none !important; }
@@ -29,10 +32,12 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 5단계 서버 자료 요청</div>
-    <h1>자료 요청을 서버 한곳으로 모읍니다</h1>
+    <div class="eyebrow">BYTE BACK · 11단계 접속 앱</div>
+    <h1>나만의 접속 앱</h1>
     <p>로그인한 계정으로 가상 메모를 추가하고, 수정하고, 삭제하세요.</p>
     <div class="notice">학습용 가상 메모만 입력하세요. 내 메모만 읽고 수정하고 삭제할 수 있습니다. 다른 계정의 메모 번호로 요청해도 자료를 반환하지 않습니다.</div>
+    <p>앱 설치는 기기 승인이 아닙니다. 오프라인에서는 보호 자료를 열거나 저장하지 않습니다.</p>
+    <button id="install-button" hidden>앱 설치</button>
     <p id="auth-status" role="status">로그인 상태를 확인하는 중입니다.</p>
     <p id="message" role="status" aria-live="polite"></p>
     <section id="login-panel">
@@ -44,8 +49,18 @@
       </form>
       <p>Supabase Auth에 등록된 실습 계정으로 로그인하세요.</p>
     </section>
+    <button id="logout-button" class="secondary" hidden>로그아웃</button>
+    <section id="device-panel" hidden>
+      <h2>기기 승인</h2>
+      <p id="device-status" role="status">로그인 전입니다.</p>
+      <p>이 기기의 인증 수단으로 승인 요청을 만들고, 운영자가 승인한 뒤 다시 확인하세요.</p>
+      <div class="actions">
+        <button id="request-device-button">기기 승인 요청</button>
+        <button id="device-status-button" class="secondary">승인 상태 새로고침</button>
+        <button id="check-device-button" class="secondary">등록 기기 확인</button>
+      </div>
+    </section>
     <div id="workspace" hidden>
-      <button id="logout-button" class="secondary">로그아웃</button>
       <section>
         <h2 id="editor-heading">새 가상 메모</h2>
         <form id="note-form">
