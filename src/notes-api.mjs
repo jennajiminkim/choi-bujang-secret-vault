@@ -1,3 +1,4 @@
+import {installMutationJournal} from './operations-journal.mjs';
 import { randomUUID } from 'node:crypto';
 import { createLoginVerifier } from './verify-login.mjs';
 
@@ -9,10 +10,11 @@ export function createNotesHandler({ config, supabase, judgeKeySet, deviceGate }
   const verify = createLoginVerifier({ config, supabaseClient: supabase, judgeKeySet });
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Request-Id', randomUUID());
+    const requestId=randomUUID();res.setHeader('X-Request-Id', requestId);
     const user = await verify(req.headers.authorization);
     if (!user) return res.status(401).json({ error: '로그인이 필요하거나 인증이 만료되었습니다.' });
     if (deviceGate && !await deviceGate({req,res,user})) return;
+    if(req.method === 'PUT')installMutationJournal({res,supabase,user,caseId:'own_write',requestId});
     const id = req.query?.id;
     if (Object.keys(req.query ?? {}).some(key => key !== 'id') || (id !== undefined && (typeof id !== 'string' || !UUID.test(id)))) {
       return res.status(400).json({ error: '쿼리에는 UUID 자료 ID만 지정할 수 있습니다.' });

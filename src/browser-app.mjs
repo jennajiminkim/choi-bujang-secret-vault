@@ -12,6 +12,7 @@ let editId = null;
 let generation = 0;
 let deviceGrant = null;
 let grantTimer;
+let mutationRecorded=null;
 const message = text => { el('message').textContent = text; };
 function resetEditor() {
   editId = null;
@@ -57,6 +58,7 @@ async function api(path = '', options = {}) {
     if (response.status === 403) lockDevice();
     throw new Error(body.error || '자료 요청을 처리하지 못했습니다.');
   }
+  if(options.method==='PUT')mutationRecorded=response.headers.get('X-Operations-Recorded')==='true';
   return body;
 }
 async function refreshNotes() {
@@ -130,7 +132,7 @@ el('note-form').addEventListener('submit', async event => {
       method: editId ? 'PUT' : 'POST', body: JSON.stringify({ title: el('title').value, body: el('body').value }),
     });
     if (version !== generation) return;
-    resetEditor(); message(updating ? '메모를 수정했습니다.' : '메모를 추가했습니다.'); await refreshNotes();
+    resetEditor(); message(updating ? (mutationRecorded?'메모 수정과 작전실 기록 저장을 완료했습니다.':'메모는 수정됐지만 작전실 기록 저장은 실패했습니다. 다시 저장하지 말고 추가 SQL 적용을 확인하세요.') : '메모를 추가했습니다.'); await refreshNotes();
   } catch (error) { message(error.message); }
   finally { el('save-button').disabled = false; }
 });
@@ -157,8 +159,8 @@ async function deviceApi(path, options = {}) {
 window.자료실요청 = async function(path, method='GET', body) {
   if(!signedIn) throw new Error('이 창에서 먼저 로그인하세요.');
   if(!navigator.onLine) throw new Error('오프라인입니다. 인터넷 연결을 확인하세요.');
-  if(typeof path!=='string'||!/^\/api\/(?:notes(?:\/[a-f0-9-]{36})?|note-backups|note-restores)(?:\?[^#]*)?$/i.test(path))
-    throw new Error('기존 메모·백업·복원 경로만 시험할 수 있습니다.');
+  if(typeof path!=='string'||!/^\/api\/(?:notes(?:\/[a-f0-9-]{36})?|notices\/[a-f0-9-]{36}|note-backups|note-restores)(?:\?[^#]*)?$/i.test(path))
+    throw new Error('기존 메모·공지·백업·복원 경로만 시험할 수 있습니다.');
   const {data,error}=await supabase.auth.getSession();
   if(error||!data.session)throw new Error('다시 로그인하세요.');
   const r=await fetch(path,{method,cache:'no-store',headers:{'Content-Type':'application/json',
@@ -167,7 +169,7 @@ window.자료실요청 = async function(path, method='GET', body) {
     ...(body===undefined?{}:{body:JSON.stringify(body)})});
   const result=await r.json();
   // Never print note bodies or tokens in console tests.
-  return {status:r.status,data:path.startsWith('/api/notes')?
+  return {status:r.status,recorded:r.headers.get('X-Operations-Recorded')==='true',requestId:r.headers.get('X-Request-Id'),data:(path.startsWith('/api/notes')||path.startsWith('/api/notices'))?
     {error:result.error??'요청이 허용되었습니다.'}:result};
 };
 async function loadDeviceStatus() {
@@ -224,6 +226,7 @@ el('check-device-button').addEventListener('click', async () => {
 });
 el('device-status-button').addEventListener('click',loadDeviceStatus);
 operations=mountOperations({
+  protectedRequest:(...args)=>window.자료실요청(...args),
   isActive:()=>signedIn&&Boolean(deviceGrant)&&navigator.onLine,
   request:async(options={})=>{
     if(!signedIn||!deviceGrant||!navigator.onLine)throw new Error('등록 기기 확인 후 작전실을 여세요.');

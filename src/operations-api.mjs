@@ -29,10 +29,11 @@ export function createOperationsHandler({config,supabase,deviceGate,judgeKeySet,
    } catch {return null;}
   };
   if(req.method==='GET'){
-   const [checks,credentials,restores]=await Promise.all([
+   const rpcData=async(name,args)=>{try{const {data,error}=await supabase.rpc(name,args);return error?null:data;}catch{return null;}};
+   const [checks,credentials,restores,capabilities]=await Promise.all([
     safeRows('vault_ops_checks','check_id,request_id,case_id,method,route,expected_statuses,actual_status,matched,checked_at,source,details','owner_id'),
     safeRows('vault_app_credentials','approved','owner_id'),
-    safeRows('vault_restore_audit','operation,at','actor_id')]);
+    rpcData('vault_ops_restore_summary',{p_actor_id:user.userId}),rpcData('vault_ops_capabilities',{})]);
    return res.status(200).json({schema:'vault.operations.v1',
     commit:/^[a-f0-9]{40}$/.test(commit??'')?commit:null,
     policy:{source:'loaded_student_module',ruleIds:[...RULE_IDS]},
@@ -47,6 +48,7 @@ export function createOperationsHandler({config,supabase,deviceGate,judgeKeySet,
      latestRestoreAt:restores?.find(r=>r.operation==='restore')?.at??null},
     checks:{status:checks?'available':'store_unavailable',totals:checks?checkTotals(checks):null,records:checks??[]},
     cases:OPERATIONS_CASES,userReports:USER_VERIFICATIONS,
+    mutationRecording:capabilities===2?'ready':'migration_required',
     assault:{expectedKinds:41,executedKinds:0,status:'not_run',source:'judge_results_not_received'},
     provenance:{engine:'ALEPH SDP 엔진(제공)',student:'판정·탐지·자료 API·승인 앱·복구·작전실',judgePassed:null}});
   }

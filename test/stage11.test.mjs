@@ -129,7 +129,7 @@ test('repeated same-account auth notification does not erase enrollment; account
   }
   if(path==='/api/notes'){
    diagnosticHeaders=options.headers;
-   return {status:403,json:async()=>({error:'기기 승인이 필요합니다.'})};
+   return {status:403,headers:new Headers(),json:async()=>({error:'기기 승인이 필요합니다.'})};
   }
   throw Error('unexpected_protected_fetch');
  };

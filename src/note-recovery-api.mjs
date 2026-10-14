@@ -1,3 +1,4 @@
+import {installMutationJournal} from './operations-journal.mjs';
 import {randomUUID} from 'node:crypto';
 import { createLoginVerifier } from './verify-login.mjs';
 import { UUID } from './resources.mjs';
@@ -5,10 +6,11 @@ export function createRecoveryHandler({config,supabase,judgeKeySet,mode,deviceGa
   const verify=createLoginVerifier({config,supabaseClient:supabase,judgeKeySet});
   return async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
-    res.setHeader('X-Request-Id', randomUUID());
+    const requestId=randomUUID();res.setHeader('X-Request-Id', requestId);
     const user=await verify(req.headers.authorization);
     if(!user)return res.status(401).json({error:'로그인이 필요합니다.',reasonCode:'login_required'});
     if(deviceGate && !await deviceGate({req,res,user}))return;
+    if(mode==='restore' && req.method==='POST')installMutationJournal({res,supabase,user,caseId:'restore_one',requestId});
     const preview=mode==='backup' && req.method==='GET';
     if(req.method!=='POST' && !preview){res.setHeader('Allow',mode==='backup'?'GET, POST':'POST');return res.status(405).json({error:'지원하지 않는 요청입니다.'});}
     let body=preview?req.query:req.body;

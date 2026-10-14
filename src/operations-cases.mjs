@@ -7,11 +7,11 @@ export const OPERATIONS_CASES = Object.freeze([
  {id:'foreign_read',stages:'4,8',label:'다른 계정의 실제 메모 읽기 거부',method:'GET',path:'/api/notes/:id',expected:[404],input:'noteId'},
  {id:'unregistered_read',stages:'6,11',label:'기기 확인값 없는 자료 요청 거부',method:'GET',path:'/api/notes',expected:[403],input:null},
  {id:'backup_verify',stages:'10',label:'본인 사전 백업 재검증',method:'GET',path:'/api/note-backups?backupId=:id',expected:[200],input:'backupId'},
- {id:'own_write',stages:'2,4,8',label:'본인 메모 수정',method:'PUT',path:'/api/notes/:id',expected:[200],runnable:false},
- {id:'notice_write',stages:'8',label:'학생 공지 수정 거부',method:'PUT',path:'/api/notices/:id',expected:[403],runnable:false},
- {id:'compound_step_up',stages:'7',label:'복합 이상과 새 로그인 확인',method:'ENGINE',path:'ALEPH SDP',expected:['step_up','verified_request_allow'],runnable:false},
- {id:'detect_revoke',stages:'9',label:'복합 탐지 제안·엔진 회수',method:'ENGINE',path:'ALEPH SDP',expected:['propose_revocation','engine_confirmed_revocation'],runnable:false},
- {id:'restore_one',stages:'10',label:'B 시험 메모 한 건 복원',method:'POST',path:'/api/note-restores',expected:[200],runnable:false},
+ {id:'own_write',stages:'2,4,8',label:'본인 메모 수정',method:'PUT',path:'/api/notes/:id',expected:[200],runnable:false,mode:'editor'},
+ {id:'notice_write',stages:'8',label:'학생 공지 수정 거부',method:'PUT',path:'/api/notices/:id',expected:[403],runnable:false,mode:'notice',input:'noticeId'},
+ {id:'compound_step_up',stages:'7',label:'복합 이상과 새 로그인 확인',method:'ENGINE',path:'ALEPH SDP',expected:['step_up','verified_request_allow'],runnable:false,mode:'engine'},
+ {id:'detect_revoke',stages:'9',label:'복합 탐지 제안·엔진 회수',method:'ENGINE',path:'ALEPH SDP',expected:['propose_revocation','engine_confirmed_revocation'],runnable:false,mode:'engine'},
+ {id:'restore_one',stages:'10',label:'B 시험 메모 한 건 복원',method:'POST',path:'/api/note-restores',expected:[200],runnable:false,mode:'restore',input:'backupId'},
 ]);
 
 // User reports have no captured request ID or exact API timestamp. Keep them separate.
