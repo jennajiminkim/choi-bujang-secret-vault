@@ -10,4 +10,4 @@
 
 서비스 경로: GET/POST /api/device-enrollment, GET/POST /api/device-check, GET /api/device-status. status 조회나 설치 표시만으로 자료를 열지 않습니다. 공개 앱 캐시는 오프라인 안내·manifest·아이콘만 보관합니다. 실제 PC 실행과 심판 결과는 사용자가 확인하기 전까지 미실행입니다.
 
-기존 콘솔 localStorage 토큰 추출 방식은 사용하지 않습니다. 승인 뒤 제한된 window.자료실요청(path, method, body)로 메모·백업·복원 API를 호출할 수 있습니다. 토큰은 함수 안에 남습니다. 메모 응답 본문은 콘솔에 노출하지 않습니다. B 로그인과 승인 후 실제 A UUID로 GET을 보내 HTTP 404인지 확인합니다.
+기존 콘솔 localStorage 토큰 추출 방식은 사용하지 않습니다. 로그인 후 제한된 window.자료실요청(path, method, body)로 서버 응답을 시험할 수 있습니다. 승인 전에는 확인값을 붙이지 않아 서버 403을 확인하고, 승인 후에는 현재 메모리의 확인값을 붙입니다. 이 도우미는 권한을 만들거나 승인 전 자료를 표시하지 않습니다. 토큰은 함수 안에 남습니다. 메모 응답 본문은 콘솔에 노출하지 않습니다. B 로그인과 승인 후 실제 A UUID로 GET을 보내 HTTP 404인지 확인합니다.

@@ -106,13 +106,18 @@ test('repeated same-account auth notification does not erase enrollment; account
   reset(){},replaceChildren(){},addEventListener(name,fn){this[name]=fn;}});return elements.get(id);};
  let authCallback;let current={user:{id:A},access_token:'test-token'};
  const auth={onAuthStateChange(fn){authCallback=fn;},async getSession(){return {data:{session:current},error:null};}};
- const fetch=async path=>{
+ let diagnosticHeaders;
+ const fetch=async (path,options)=>{
   if(path==='/auth-config.json')return {ok:true,json:async()=>({url:'https://vault.supabase.co',publishableKey:'sb_publishable_fixture'})};
   if(path==='/api/device-status')return {ok:true,json:async()=>({status:'unverified'})};
   if(path==='/api/device-enrollment'){
    // Supabase can re-emit SIGNED_IN for the same account during a focus/refresh.
    authCallback('SIGNED_IN',current);
    return {ok:true,json:async()=>({challengeId:A,challenge:'fixture',deviceId:'0123456789abcdef'})};
+  }
+  if(path==='/api/notes'){
+   diagnosticHeaders=options.headers;
+   return {status:403,json:async()=>({error:'기기 승인이 필요합니다.'})};
   }
   throw Error('unexpected_protected_fetch');
  };
@@ -127,4 +132,10 @@ test('repeated same-account auth notification does not erase enrollment; account
  current={user:{id:B},access_token:'other-test-token'};authCallback('SIGNED_IN',current);
  assert.equal(element('workspace').hidden,true);
  assert.doesNotMatch(element('device-status').textContent,/0123456789abcdef/);
+ // The diagnostic helper can observe a real server denial without a grant.
+ // It does not open the workspace or grant access.
+ const denied=await window.자료실요청('/api/notes');
+ assert.equal(denied.status,403);
+ assert.equal(diagnosticHeaders['X-Vault-Device-Grant'],undefined);
+ assert.equal(element('workspace').hidden,true);
 });

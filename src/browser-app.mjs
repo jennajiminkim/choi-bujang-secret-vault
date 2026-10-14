@@ -150,13 +150,15 @@ async function deviceApi(path, options = {}) {
 }
 // A bounded diagnostic/recovery helper; credentials remain inside this module.
 window.자료실요청 = async function(path, method='GET', body) {
-  if(!signedIn || !deviceGrant || !navigator.onLine) throw new Error('로그인 후 등록 기기 확인을 먼저 완료하세요.');
+  if(!signedIn) throw new Error('이 창에서 먼저 로그인하세요.');
+  if(!navigator.onLine) throw new Error('오프라인입니다. 인터넷 연결을 확인하세요.');
   if(typeof path!=='string'||!/^\/api\/(?:notes(?:\/[a-f0-9-]{36})?|note-backups|note-restores)(?:\?[^#]*)?$/i.test(path))
     throw new Error('기존 메모·백업·복원 경로만 시험할 수 있습니다.');
   const {data,error}=await supabase.auth.getSession();
   if(error||!data.session)throw new Error('다시 로그인하세요.');
   const r=await fetch(path,{method,cache:'no-store',headers:{'Content-Type':'application/json',
-    Authorization:`Bearer ${data.session.access_token}`,'X-Vault-Device-Grant':deviceGrant},
+    Authorization:`Bearer ${data.session.access_token}`,
+    ...(deviceGrant?{'X-Vault-Device-Grant':deviceGrant}:{})},
     ...(body===undefined?{}:{body:JSON.stringify(body)})});
   const result=await r.json();
   // Never print note bodies or tokens in console tests.
