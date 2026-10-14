@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a28">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <title>BYTE BACK | 나만의 접속 앱 준비</title>
+  <style>
+    :root { color-scheme:dark; font-family:system-ui,sans-serif; }
+    * { box-sizing:border-box; } [hidden] { display:none !important; }
+    body { margin:0; background:#101a28; color:#ecf4ff; }
+    main { max-width:760px; margin:auto; padding:44px 22px; }
+    .eyebrow { color:#8ad8df; font-weight:700; }
+    h1 { font-size:clamp(30px,7vw,48px); }
+    p { line-height:1.7; color:#bfd0e5; }
+    section { margin:24px 0; padding:24px; border:1px solid #51667c; border-radius:14px; background:#1a2a3d; }
+    button { padding:12px 18px; margin:8px 8px 8px 0; border:1px solid #8ad8df; border-radius:8px; background:#8ad8df; color:#101a28; font:inherit; cursor:pointer; }
+    :focus-visible { outline:3px solid #f7cc82; outline-offset:3px; }
+    #message { color:#fff0d8; min-height:2em; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">BYTE BACK · 접속 앱 준비 화면</div>
+    <h1>나만의 접속 앱</h1>
+    <p>앱 설치는 기기 승인이 아닙니다. 서버가 이 기기를 확인하기 전에는 이 앱에서 보호 자료를 표시하지 않습니다.</p>
+    <button id="install" hidden>앱 설치</button>
+    <section aria-labelledby="approval-heading">
+      <h2 id="approval-heading">기기 승인</h2>
+      <p id="status" role="status">기기 확인 연결 준비 중 · 승인 상태를 확인하지 못했습니다.</p>
+      <button id="request">기기 승인 요청 안내</button>
+      <p id="message" role="status" aria-live="polite"></p>
+      <p>현재 승인 서버 연결이 없어 요청을 접수할 수 없습니다. 이 화면에서 승인 완료로 바꾸거나 자료실을 열지 않습니다.</p>
+    </section>
+    <p>오프라인에서는 보호 자료를 열거나 저장하지 않습니다. 다시 연결한 뒤 서버의 기기 확인이 필요합니다.</p>
+  </main>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
