@@ -1,4 +1,3 @@
-import { createDeviceGate } from '../src/device-approval.mjs';
 import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with {type:'json'};
 import { createRecoveryHandler } from '../src/note-recovery-api.mjs';
@@ -12,7 +11,7 @@ export default async function restore(req,res){
    if(!url||!secret||new URL(url).origin!==new URL(config.identityProvider.issuer).origin)
     return res.status(503).json({error:'서버 설정을 확인하세요.'});
    const supabase=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-   handler=createRecoveryHandler({config,supabase,deviceGate:createDeviceGate({supabase}),mode:'restore'});
+   handler=createRecoveryHandler({config,supabase,mode:'restore'});
   }
   return await handler(req,res);
  }catch{return res.status(503).json({error:'복구 서버에 연결할 수 없습니다.'});}

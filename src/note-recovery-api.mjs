@@ -1,12 +1,11 @@
 import { createLoginVerifier } from './verify-login.mjs';
 import { UUID } from './resources.mjs';
-export function createRecoveryHandler({config,supabase,judgeKeySet,mode,deviceGate}) {
+export function createRecoveryHandler({config,supabase,judgeKeySet,mode}) {
   const verify=createLoginVerifier({config,supabaseClient:supabase,judgeKeySet});
   return async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     const user=await verify(req.headers.authorization);
     if(!user)return res.status(401).json({error:'로그인이 필요합니다.',reasonCode:'login_required'});
-    if(deviceGate && !await deviceGate({req,res,user}))return;
     const preview=mode==='backup' && req.method==='GET';
     if(req.method!=='POST' && !preview){res.setHeader('Allow',mode==='backup'?'GET, POST':'POST');return res.status(405).json({error:'지원하지 않는 요청입니다.'});}
     let body=preview?req.query:req.body;

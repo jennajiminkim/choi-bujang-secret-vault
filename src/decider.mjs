@@ -6,8 +6,6 @@ import { inspectAccessSignals } from './access-signals.mjs';
 
 export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required', 'zone_notes_self', 'zone_notes_no_bulk', 'zone_announcements', 'zone_instructor_materials']);
 
-export function isDeviceRegistered(request) { return request?.deviceRegistered === true; }
-
 export async function decide(request) {
   const response = (decision, reasonCode, ruleId) => ({
     schema: 'aleph.decision.v1',
@@ -16,7 +14,7 @@ export async function decide(request) {
     reasonCode,
     ruleIds: [ruleId],
   });
-  if (!isDeviceRegistered(request)) {
+  if (request?.deviceRegistered !== true) {
     return response('deny', 'device_not_registered', 'device_registered');
   }
 

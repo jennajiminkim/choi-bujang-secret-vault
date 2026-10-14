@@ -12,14 +12,22 @@ Table Editor의 notes에서 B가 방금 만든 가상 메모를 찾습니다. �
 
 ## 3. B로 로그인한 자료실에서 백업
 
-B의 창에서 개발자 도구 → Console을 열고 아래 함수를 한 번 정의합니다. 11단계에서는 로그인과 등록 기기 확인을 완료한 앱의 메모리 세션을 내부에서 사용하며, 토큰을 저장소에서 읽거나 출력하지 않습니다. 이전 10단계 화면의 콘솔 함수는 당시 기록으로 구분합니다. 로그인한 같은 자료실 도메인에서 실행하세요. 콘솔 명령의 ID를 답변이나 GitHub에 붙여 넣지 마세요.
+B의 창에서 개발자 도구 → Console을 열고 아래 함수를 한 번 정의합니다. 기존 세션을 브라우저 내부에서만 사용하며 토큰을 출력하지 않습니다. 로그인한 같은 자료실 도메인에서 실행하세요. 콘솔 명령의 ID를 답변이나 GitHub에 붙여 넣지 마세요.
 
 ```js
-async function 복구시험(path, method='GET', body) {
-  if (!window.자료실요청) throw new Error('11단계 앱의 로그인과 등록 기기 확인을 완료하세요.');
-  const 결과 = await window.자료실요청(path, method, body);
-  console.log(결과);
-  return 결과;
+async function 복구시험(path, method, body) {
+  const key = Object.keys(localStorage).find(k => /^sb-.*-auth-token$/.test(k));
+  const stored = key ? JSON.parse(localStorage.getItem(key)) : null;
+  const token = stored?.access_token ?? stored?.currentSession?.access_token;
+  if (!token) throw new Error('B 계정으로 로그인한 자료실 창에서 실행하세요.');
+  const r = await fetch(path, {
+    method,
+    headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+    ...(body === undefined ? {} : {body: JSON.stringify(body)})
+  });
+  const data = await r.json();
+  console.log({status: r.status, ...data});
+  return {status: r.status, data};
 }
 ```
 

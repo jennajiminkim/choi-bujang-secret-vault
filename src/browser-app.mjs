@@ -1,13 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 const el = id => document.getElementById(id);
 let supabase;
 let signedIn = false;
 let editId = null;
 let generation = 0;
-let deviceGrant = null;
-let grantTimer;
 const message = text => { el('message').textContent = text; };
 function resetEditor() {
   editId = null;
@@ -20,39 +17,33 @@ function showSession(session) {
   generation++;
   signedIn = Boolean(session);
   el('login-panel').hidden = signedIn;
-  clearTimeout(grantTimer); deviceGrant = null;
-  el('workspace').hidden = true;
-  el('device-panel').hidden = !signedIn;
-  el('logout-button').hidden = !signedIn;
-  el('device-status').textContent = signedIn ? '기기 확인이 필요합니다.' : '로그인 전입니다.';
-  el('auth-status').textContent = signedIn ? '로그인했습니다. 서버의 기기 승인과 인증 수단 확인 후 자료실이 열립니다.' : '로그아웃 상태입니다. 자료를 보려면 로그인하세요.';
+  el('workspace').hidden = !signedIn;
+  el('auth-status').textContent = signedIn ? '로그인했습니다. 내 메모를 사용할 수 있습니다.' : '로그아웃 상태입니다. 자료를 보려면 로그인하세요.';
   el('notes').replaceChildren();
   resetEditor();
   if (!signedIn) el('password').value = '';
 }
 async function api(path = '', options = {}) {
-  if (!deviceGrant || !navigator.onLine) throw new Error('등록 기기를 먼저 확인하세요. 오프라인에서는 자료를 열지 않습니다.');
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new Error('로그인이 필요합니다.');
   const response = await fetch(`/api/notes${path}`, {
     ...options, cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}`, 'X-Vault-Device-Grant': deviceGrant },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
   });
   let body;
   try { body = await response.json(); } catch { throw new Error('자료 서버가 JSON 응답을 반환하지 않았습니다.'); }
   if (!response.ok) {
     if (response.status === 401) showSession(null);
-    if (response.status === 403) lockDevice();
     throw new Error(body.error || '자료 요청을 처리하지 못했습니다.');
   }
   return body;
 }
 async function refreshNotes() {
   const current = generation;
-  if (!signedIn || !deviceGrant) return;
+  if (!signedIn) return;
   try {
     const notes = await api();
-    if (current !== generation || !signedIn || !deviceGrant) return;
+    if (current !== generation || !signedIn) return;
     if (!Array.isArray(notes)) throw new Error('메모 목록 형식이 맞지 않습니다.');
     const items = notes.map(note => {
       const item = document.createElement('li');
@@ -83,7 +74,7 @@ async function refreshNotes() {
     });
     if (!items.length) { const item = document.createElement('li'); item.textContent = '아직 내 메모가 없습니다. 위에서 첫 가상 메모를 추가하세요.'; items.push(item); }
     el('notes').replaceChildren(...items);
-  } catch (error) { if (current === generation) { lockDevice(); message(error.message); } }
+  } catch (error) { if (current === generation) message(error.message); }
 }
 const authReasons = {
   invalid_credentials: '이메일 또는 비밀번호가 올바르지 않습니다.',
@@ -97,7 +88,7 @@ el('login-form').addEventListener('submit', async event => {
     const { data, error } = await supabase.auth.signInWithPassword({ email: el('email').value.trim(), password: el('password').value });
     el('password').value = '';
     if (error) { message(authReasons[error.code] || '로그인 서버에 연결할 수 없습니다. 계정 및 프로젝트 설정을 확인해 주세요.'); return; }
-    showSession(data.session); message('로그인했습니다. 기기 승인 상태를 확인하세요.'); await loadDeviceStatus();
+    showSession(data.session); message('로그인했습니다.'); await refreshNotes();
   } catch { message('로그인 서버에 연결할 수 없습니다.'); }
   finally { el('password').value = ''; el('login-button').disabled = false; }
 });
@@ -124,105 +115,20 @@ el('note-form').addEventListener('submit', async event => {
 });
 el('cancel-button').addEventListener('click', resetEditor);
 el('refresh-button').addEventListener('click', refreshNotes);
-function lockDevice() {
-  generation++; deviceGrant = null; clearTimeout(grantTimer);
-  el('workspace').hidden = true; el('notes').replaceChildren(); resetEditor();
-  el('device-status').textContent = '기기 확인이 필요합니다. 승인·확인 전 자료는 표시하지 않습니다.';
-}
-async function deviceApi(path, options = {}) {
-  if (!navigator.onLine) throw new Error('오프라인입니다. 자료와 승인 결과를 저장해 두지 않습니다.');
-  const {data,error} = await supabase.auth.getSession();
-  if (error || !data.session) throw new Error('다시 로그인하세요.');
-  const r = await fetch(path, {...options,cache:'no-store',
-    headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`}});
-  const result = await r.json();
-  if (!r.ok) throw new Error(result.error || '기기 확인에 실패했습니다.');
-  return result;
-}
-// A bounded diagnostic/recovery helper; credentials remain inside this module.
-window.자료실요청 = async function(path, method='GET', body) {
-  if(!signedIn || !deviceGrant || !navigator.onLine) throw new Error('로그인 후 등록 기기 확인을 먼저 완료하세요.');
-  if(typeof path!=='string'||!/^\/api\/(?:notes(?:\/[a-f0-9-]{36})?|note-backups|note-restores)(?:\?[^#]*)?$/i.test(path))
-    throw new Error('기존 메모·백업·복원 경로만 시험할 수 있습니다.');
-  const {data,error}=await supabase.auth.getSession();
-  if(error||!data.session)throw new Error('다시 로그인하세요.');
-  const r=await fetch(path,{method,cache:'no-store',headers:{'Content-Type':'application/json',
-    Authorization:`Bearer ${data.session.access_token}`,'X-Vault-Device-Grant':deviceGrant},
-    ...(body===undefined?{}:{body:JSON.stringify(body)})});
-  const result=await r.json();
-  // Never print note bodies or tokens in console tests.
-  return {status:r.status,data:path.startsWith('/api/notes')?
-    {error:result.error??'요청이 허용되었습니다.'}:result};
-};
-async function loadDeviceStatus() {
-  if (!signedIn) return;
-  try {
-    const status = await deviceApi('/api/device-status');
-    if (!deviceGrant) el('device-status').textContent =
-      `승인 대기 ${status.pendingCount}건 · 승인된 인증 수단 ${status.approvedCount}건. 이 기기의 소유 증명은 아직 확인하지 않았습니다.`;
-  } catch (error) { message(error.message); }
-}
-el('request-device-button').addEventListener('click', async () => {
-  const button = el('request-device-button'); button.disabled = true; lockDevice();
-  try {
-    if (!window.PublicKeyCredential) throw new Error('이 브라우저는 WebAuthn을 지원하지 않습니다.');
-    const begin = await deviceApi('/api/device-enrollment');
-    const response = await startRegistration({optionsJSON:begin.options});
-    const result = await deviceApi('/api/device-enrollment', {method:'POST',
-      body:JSON.stringify({challengeId:begin.challengeId,response})});
-    el('device-status').textContent = `승인 대기 · 요청 기기 ${result.deviceId}. 운영자 확인 전 자료를 열 수 없습니다.`;
-    message('승인 요청만 저장했습니다. 운영자가 확인한 뒤 등록 기기 확인을 누르세요.');
-  } catch (error) { message(error.message || '승인 요청이 취소됐습니다.'); }
-  finally { button.disabled = false; }
-});
-el('check-device-button').addEventListener('click', async () => {
-  const button=el('check-device-button');button.disabled=true;lockDevice();
-  try {
-    const begin=await deviceApi('/api/device-check');
-    const response=await startAuthentication({optionsJSON:begin.options});
-    const result=await deviceApi('/api/device-check',{method:'POST',
-      body:JSON.stringify({challengeId:begin.challengeId,response})});
-    if(result.deviceRegistered!==true || typeof result.grant!=='string') throw new Error('서버가 기기를 확인하지 못했습니다.');
-    const lifetime=Date.parse(result.expiresAt)-Date.now();
-    if(!Number.isFinite(lifetime)||lifetime<=0||lifetime>5*60000)throw new Error('기기 확인이 만료됐습니다.');
-    deviceGrant=result.grant; // RAM only; never localStorage, IndexedDB, cookies or Cache.
-    el('workspace').hidden=false;
-    el('device-status').textContent='서버 승인과 인증 수단 소유 확인 완료. 자료실을 사용할 수 있습니다.';
-    grantTimer=setTimeout(()=>{lockDevice();message('기기 확인이 만료됐습니다. 다시 확인하세요.');},lifetime);
-    await refreshNotes();
-  }catch(error){lockDevice();message(error.message || '기기 확인이 취소됐습니다.');}
-  finally{button.disabled=false;}
-});
-el('device-status-button').addEventListener('click',loadDeviceStatus);
-let installPrompt;
-window.addEventListener('beforeinstallprompt',event=>{
-  event.preventDefault();installPrompt=event;el('install-button').hidden=false;
-});
-el('install-button').addEventListener('click',async()=>{
-  if(installPrompt){await installPrompt.prompt();installPrompt=null;el('install-button').hidden=true;}
-});
-window.addEventListener('offline',()=>{lockDevice();message('오프라인입니다. 보호 자료를 표시하지 않습니다.');});
-window.addEventListener('online',()=>{message('다시 연결되었습니다. 등록 기기를 확인하세요.');});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
-
 try {
   const response = await fetch('/auth-config.json', { cache: 'no-store' });
   if (!response.ok) throw new Error();
   const config = await response.json();
   if (typeof config.publishableKey !== 'string' || !config.publishableKey.startsWith('sb_publishable_')) throw new Error();
-  // Remove only the old project's persisted session; never read or print it.
-  localStorage.removeItem(`sb-${new URL(config.url).hostname.split('.')[0]}-auth-token`);
-  supabase = createClient(config.url, config.publishableKey, {
-    auth: {persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}
-  });
+  supabase = createClient(config.url, config.publishableKey);
   supabase.auth.onAuthStateChange((_event, session) => {
     showSession(session);
     // Keep SDK operations outside its synchronous auth-state callback.
-    if (session) setTimeout(loadDeviceStatus, 0);
+    if (session) setTimeout(refreshNotes, 0);
   });
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  showSession(data.session); el('login-button').disabled = false; if (data.session) await loadDeviceStatus();
+  showSession(data.session); el('login-button').disabled = false; await refreshNotes();
 } catch {
   showSession(null); message('로그인 설정을 불러올 수 없습니다. 프로젝트의 공개 키와 주소를 확인해 주세요.');
 }

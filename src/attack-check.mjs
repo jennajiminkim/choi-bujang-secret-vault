@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('현재 자기 점검은 5~11단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('현재 자기 점검은 5~10단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -101,7 +101,7 @@ export async function runAttackChecks(config) {
         attackId:'live_device_revocation', expected:'심판의 복합 의심 기기 한 개 회수·정상 기기 유지 및 경과 시간 측정',
         observed:'미실행: 학생 함수는 회수 제안만 반환하며 실제 집행·시간 측정은 심판이 수행합니다.' };
     }
-    if (config.step >= 10) {
+    if (config.step === 10) {
       // Keep the submission limit at 20: replace unrelated live teacher/grant placeholders.
       const { rehearsePolicyRestore } = await import('../scripts/policy-restore.mjs');
       const trial = await rehearsePolicyRestore();
@@ -117,13 +117,6 @@ export async function runAttackChecks(config) {
       results.splice(index,1);
       await check('anonymous_note_restore','/api/note-restores','익명 POST 복원은 401 또는 403 JSON 오류',
         {method:'POST'},denied);
-    }
-    if (config.step === 11) {
-      const {runDeviceGateChecks}=await import('../scripts/device-test.mjs');
-      const checked=await runDeviceGateChecks();
-      results[results.findIndex(item=>item.attackId==='local_previous_rules')]={
-        attackId:'local_device_approval',expected:'로컬 승인 전 거부·승인 후 허용·철회 후 거부·위조 확인값 거부 및 이전 네 판정 유지',
-        observed:`로컬 기기 게이트 ${checked.passed}/${checked.total}; 이전 판정 ${priorResults.filter(Boolean).length}/4; 실제 PC의 WebAuthn·운영 승인 흐름은 별도 확인 필요`};
     }
     return results;
   }
