@@ -5,6 +5,7 @@ let sessionIdentity;
 const el = id => document.getElementById(id);
 let supabase;
 let signedIn = false;
+let sessionUserId = null;
 let editId = null;
 let generation = 0;
 let deviceGrant = null;
@@ -18,6 +19,11 @@ function resetEditor() {
   el('cancel-button').hidden = true;
 }
 function showSession(session) {
+  const nextUserId = session?.user?.id ?? null;
+  // Supabase may repeat SIGNED_IN/TOKEN_REFRESHED for the same account.
+  // Preserve the RAM key and pending request unless the account actually changes.
+  if (nextUserId && nextUserId === sessionUserId && signedIn) return false;
+  sessionUserId = nextUserId;
   generation++;
   sessionIdentity=null;
   signedIn = Boolean(session);
@@ -31,6 +37,7 @@ function showSession(session) {
   el('notes').replaceChildren();
   resetEditor();
   if (!signedIn) el('password').value = '';
+  return true;
 }
 async function api(path = '', options = {}) {
   if (!deviceGrant || !navigator.onLine) throw new Error('등록 기기를 먼저 확인하세요. 오프라인에서는 자료를 열지 않습니다.');
@@ -158,15 +165,18 @@ window.자료실요청 = async function(path, method='GET', body) {
 };
 async function loadDeviceStatus() {
   if (!signedIn) return;
+  const version = generation;
   try {
     const status = await deviceApi('/api/device-status');
-    if (!deviceGrant) el('device-status').textContent =
+    if (version !== generation || !signedIn) return;
+    if (!deviceGrant && !sessionIdentity) el('device-status').textContent =
       '현재 앱의 인증이 필요합니다. 승인 요청 후 운영자 승인과 등록 기기 확인을 완료하세요.';
   } catch (error) { message(error.message); }
 }
 el('request-device-button').addEventListener('click', async () => {
   const button = el('request-device-button'); button.disabled = true; lockDevice();
   const version=generation;
+  message('승인 요청을 보내는 중입니다. 잠시 기다려 주세요.');
   try {
     if(!sessionIdentity) {
       const identity=await createSessionIdentity();
@@ -227,9 +237,9 @@ try {
     auth: {persistSession:false, autoRefreshToken:true, detectSessionInUrl:false}
   });
   supabase.auth.onAuthStateChange((_event, session) => {
-    showSession(session);
+    const changed = showSession(session);
     // Keep SDK operations outside its synchronous auth-state callback.
-    if (session) setTimeout(loadDeviceStatus, 0);
+    if (session && changed) setTimeout(loadDeviceStatus, 0);
   });
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;

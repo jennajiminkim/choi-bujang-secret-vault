@@ -98,3 +98,33 @@ test('public cache list contains no protected resources; approval SQL is owner-b
  assert.equal((await pg.query("select * from vault_consume_device_challenge($1,$2,'authentication')",[B,A])).rows.length,0);
  await pg.close();
 });
+test('repeated same-account auth notification does not erase enrollment; account switch still locks',async()=>{
+ const {runInNewContext}=await import('node:vm');
+ const source=(await readFile(new URL('../src/browser-app.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
+ const elements=new Map();
+ const element=id=>{if(!elements.has(id))elements.set(id,{hidden:true,value:'',disabled:false,
+  reset(){},replaceChildren(){},addEventListener(name,fn){this[name]=fn;}});return elements.get(id);};
+ let authCallback;let current={user:{id:A},access_token:'test-token'};
+ const auth={onAuthStateChange(fn){authCallback=fn;},async getSession(){return {data:{session:current},error:null};}};
+ const fetch=async path=>{
+  if(path==='/auth-config.json')return {ok:true,json:async()=>({url:'https://vault.supabase.co',publishableKey:'sb_publishable_fixture'})};
+  if(path==='/api/device-status')return {ok:true,json:async()=>({status:'unverified'})};
+  if(path==='/api/device-enrollment'){
+   // Supabase can re-emit SIGNED_IN for the same account during a focus/refresh.
+   authCallback('SIGNED_IN',current);
+   return {ok:true,json:async()=>({challengeId:A,challenge:'fixture',deviceId:'0123456789abcdef'})};
+  }
+  throw Error('unexpected_protected_fetch');
+ };
+ const window={addEventListener(){}};
+ const context={createClient:()=>({auth}),createSessionIdentity,signSessionChallenge:(i,m,c)=>signSessionChallenge(i,m,c,origin),
+  document:{getElementById:element},window,navigator:{onLine:true},localStorage:{removeItem(){}},
+  fetch,URL,setTimeout:()=>1,clearTimeout(){},console};
+ await runInNewContext('(async()=>{'+source+'})()',context);
+ await element('request-device-button').click();
+ assert.match(element('device-status').textContent,/승인 대기.*0123456789abcdef/);
+ assert.equal(element('workspace').hidden,true);
+ current={user:{id:B},access_token:'other-test-token'};authCallback('SIGNED_IN',current);
+ assert.equal(element('workspace').hidden,true);
+ assert.doesNotMatch(element('device-status').textContent,/0123456789abcdef/);
+});
