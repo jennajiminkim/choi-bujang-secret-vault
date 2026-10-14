@@ -9,6 +9,7 @@ export function createNotesHandler({ config, supabase, judgeKeySet, deviceGate }
   const verify = createLoginVerifier({ config, supabaseClient: supabase, judgeKeySet });
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Request-Id', randomUUID());
     const user = await verify(req.headers.authorization);
     if (!user) return res.status(401).json({ error: '로그인이 필요하거나 인증이 만료되었습니다.' });
     if (deviceGate && !await deviceGate({req,res,user})) return;

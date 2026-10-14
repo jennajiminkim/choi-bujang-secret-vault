@@ -22,7 +22,9 @@
     "test:recovery": "node --test test/note-recovery.test.mjs",
     "policy:restore": "node scripts/policy-restore.mjs",
     "test:stage10": "node --test test/policy-recovery.test.mjs test/note-recovery.test.mjs",
-    "test:stage11": "node --test test/stage11.test.mjs"
+    "test:stage11": "node --test test/stage11.test.mjs",
+    "test:stage12": "node --test test/stage12.test.mjs",
+    "test:campaign": "node --test --test-concurrency=2 test/stage3.test.mjs test/stage4-rls.test.mjs test/stage5-grants.test.mjs test/stage6.test.mjs test/stage7.test.mjs test/stage8.test.mjs test/stage9.test.mjs test/policy-recovery.test.mjs test/note-recovery.test.mjs test/stage11.test.mjs test/stage12.test.mjs test/r5.test.mjs test/xdr-run.test.mjs test/brute-force.test.mjs test/web-injection.test.mjs"
   },
   "engines": {
     "node": ">=22"

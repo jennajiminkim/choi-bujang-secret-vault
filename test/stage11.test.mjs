@@ -122,7 +122,7 @@ test('repeated same-account auth notification does not erase enrollment; account
   throw Error('unexpected_protected_fetch');
  };
  const window={addEventListener(){}};
- const context={createClient:()=>({auth}),createSessionIdentity,signSessionChallenge:(i,m,c)=>signSessionChallenge(i,m,c,origin),
+ const context={mountOperations:()=>({reset(){},load(){}}),createClient:()=>({auth}),createSessionIdentity,signSessionChallenge:(i,m,c)=>signSessionChallenge(i,m,c,origin),
   document:{getElementById:element},window,navigator:{onLine:true},localStorage:{removeItem(){}},
   fetch,URL,setTimeout:()=>1,clearTimeout(){},console};
  await runInNewContext('(async()=>{'+source+'})()',context);

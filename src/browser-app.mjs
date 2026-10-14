@@ -1,3 +1,4 @@
+import {mountOperations} from './operations-view.mjs';
 import { createClient } from '@supabase/supabase-js';
 import {createSessionIdentity, signSessionChallenge} from './session-identity.mjs';
 let sessionIdentity;
@@ -6,6 +7,7 @@ const el = id => document.getElementById(id);
 let supabase;
 let signedIn = false;
 let sessionUserId = null;
+let operations;
 let editId = null;
 let generation = 0;
 let deviceGrant = null;
@@ -26,6 +28,7 @@ function showSession(session) {
   sessionUserId = nextUserId;
   generation++;
   sessionIdentity=null;
+  operations?.reset();
   signedIn = Boolean(session);
   el('login-panel').hidden = signedIn;
   clearTimeout(grantTimer); deviceGrant = null;
@@ -134,6 +137,7 @@ el('note-form').addEventListener('submit', async event => {
 el('cancel-button').addEventListener('click', resetEditor);
 el('refresh-button').addEventListener('click', refreshNotes);
 function lockDevice() {
+  operations?.reset();
   generation++; deviceGrant = null; clearTimeout(grantTimer);
   el('workspace').hidden = true; el('notes').replaceChildren(); resetEditor();
   el('device-status').textContent = '기기 확인이 필요합니다. 승인·확인 전 자료는 표시하지 않습니다.';
@@ -143,9 +147,10 @@ async function deviceApi(path, options = {}) {
   const {data,error} = await supabase.auth.getSession();
   if (error || !data.session) throw new Error('다시 로그인하세요.');
   const r = await fetch(path, {...options,cache:'no-store',
-    headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`}});
+    headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`,
+      ...(path==='/api/operations'&&deviceGrant?{'X-Vault-Device-Grant':deviceGrant}:{})}});
   const result = await r.json();
-  if (!r.ok) throw new Error(result.error || '기기 확인에 실패했습니다.');
+  if (!r.ok) {if(r.status===403&&path==='/api/operations')lockDevice();throw new Error(result.error || '기기 확인에 실패했습니다.');}
   return result;
 }
 // A bounded diagnostic/recovery helper; credentials remain inside this module.
@@ -213,10 +218,18 @@ el('check-device-button').addEventListener('click', async () => {
     el('device-status').textContent='서버 승인과 인증 수단 소유 확인 완료. 자료실을 사용할 수 있습니다.';
     grantTimer=setTimeout(()=>{lockDevice();message('기기 확인이 만료됐습니다. 다시 확인하세요.');},lifetime);
     await refreshNotes();
+    void operations.load();
   }catch(error){lockDevice();message(error.message || '기기 확인이 취소됐습니다.');}
   finally{button.disabled=false;}
 });
 el('device-status-button').addEventListener('click',loadDeviceStatus);
+operations=mountOperations({
+  isActive:()=>signedIn&&Boolean(deviceGrant)&&navigator.onLine,
+  request:async(options={})=>{
+    if(!signedIn||!deviceGrant||!navigator.onLine)throw new Error('등록 기기 확인 후 작전실을 여세요.');
+    return deviceApi('/api/operations',options);
+  }
+});
 let installPrompt;
 window.addEventListener('beforeinstallprompt',event=>{
   event.preventDefault();installPrompt=event;el('install-button').hidden=false;

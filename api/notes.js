@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto';
 import { createDeviceGate } from '../src/device-approval.mjs';
 import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with { type: 'json' };
@@ -6,6 +7,7 @@ import { createNotesHandler } from '../src/notes-api.mjs';
 let handler;
 export default async function notes(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Request-Id', randomUUID());
   if (!req.headers.authorization) {
     return res.status(401).json({ error: '로그인이 필요합니다.' });
   }

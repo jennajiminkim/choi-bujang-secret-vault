@@ -1,9 +1,11 @@
+import {randomUUID} from 'node:crypto';
 import { createLoginVerifier } from './verify-login.mjs';
 import { UUID } from './resources.mjs';
 export function createRecoveryHandler({config,supabase,judgeKeySet,mode,deviceGate}) {
   const verify=createLoginVerifier({config,supabaseClient:supabase,judgeKeySet});
   return async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
+    res.setHeader('X-Request-Id', randomUUID());
     const user=await verify(req.headers.authorization);
     if(!user)return res.status(401).json({error:'로그인이 필요합니다.',reasonCode:'login_required'});
     if(deviceGate && !await deviceGate({req,res,user}))return;

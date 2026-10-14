@@ -28,11 +28,13 @@
     strong { display: block; font-size: 18px; margin-bottom: 5px; overflow-wrap: anywhere; }
     li span { color: #bfd0e5; white-space: pre-wrap; overflow-wrap: anywhere; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; } #message { min-height: 28px; color: #fff0d8; }
+    select { width:100%; padding:12px; font:inherit; background:#101a28; color:#ecf4ff; border:1px solid #64819c; border-radius:8px; }
+    table { border-collapse:collapse; min-width:920px; font-size:13px; } th, td { padding:10px; border:1px solid #51667c; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 11단계 접속 앱</div>
+    <div class="eyebrow">BYTE BACK · 12단계 탈환 작전실</div>
     <h1>나만의 접속 앱</h1>
     <p>로그인한 계정으로 가상 메모를 추가하고, 수정하고, 삭제하세요.</p>
     <div class="notice">학습용 가상 메모만 입력하세요. 내 메모만 읽고 수정하고 삭제할 수 있습니다. 다른 계정의 메모 번호로 요청해도 자료를 반환하지 않습니다.</div>
@@ -61,6 +63,21 @@
       </div>
     </section>
     <div id="workspace" hidden>
+      <div class="actions"><button type="button" id="ops-open">탈환 작전실 보기</button><button type="button" id="vault-open" class="secondary">내 메모 보기</button></div>
+      <section aria-labelledby="ops-heading" id="operations-panel" hidden>
+        <h2 id="ops-heading">탈환 작전실</h2>
+        <p>서버 HTTP 기록·사용자 보고·미실행을 구분합니다. API는 상태·JSON 형식·서버 요청 ID가 맞아야 기대 일치입니다. 화면의 성공 문구는 심판 통과 근거가 아닙니다.</p>
+        <p id="ops-summary" style="white-space:pre-wrap">승인 후 서버 기록을 읽습니다.</p>
+        <button type="button" id="ops-refresh" class="secondary">서버 기록 새로고침</button>
+        <button type="button" id="ops-download" class="secondary" disabled>가린 기록 JSON 내려받기</button>
+        <label for="ops-case">읽기 점검 선택</label><select id="ops-case" aria-label="점검 종류"></select>
+        <label for="ops-target">실제 메모 ID 또는 백업 ID (필요할 때만)</label>
+        <input id="ops-target" autocomplete="off" placeholder="ID는 요청에만 사용하고 기록에서는 가립니다">
+        <p>다른 계정 점검에는 그 계정에서 존재를 확인한 실제 메모 ID를 씁니다. 없는 ID의 404만으로 소유권 방어를 증명하지 않습니다. 수정·삭제·복원은 이 버튼으로 실행하지 않습니다.</p>
+        <button type="button" id="ops-run">실제 읽기 점검 실행</button><p id="ops-message" role="status" aria-live="polite"></p>
+        <div style="overflow-x:auto"><table><tbody id="ops-table"></tbody></table></div>
+      </section>
+      <div id="notes-area">
       <section>
         <h2 id="editor-heading">새 가상 메모</h2>
         <form id="note-form">
@@ -70,6 +87,7 @@
         </form>
       </section>
       <section><h2>내 가상 메모</h2><button id="refresh-button" class="secondary">새로고침</button><ul id="notes" aria-live="polite"></ul></section>
+      </div>
     </div>
   </main>
   <script type="module" src="/assets/app.js"></script>

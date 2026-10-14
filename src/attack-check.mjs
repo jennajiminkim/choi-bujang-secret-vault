@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('현재 자기 점검은 5~11단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8, 9, 10, 11, 12].includes(config.step)) throw new Error('현재 자기 점검은 5~12단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -117,6 +117,18 @@ export async function runAttackChecks(config) {
       results.splice(index,1);
       await check('anonymous_note_restore','/api/note-restores','익명 POST 복원은 401 또는 403 JSON 오류',
         {method:'POST'},denied);
+    }
+    if (config.step === 12) {
+      // This is a 20-entry self-check, not the judge's 41-kind assault.
+      const index=results.findIndex(item=>item.attackId==='browser_public_key');
+      if(index>=0)results.splice(index,1);
+      await check('anonymous_operations','/api/operations','익명 작전실 API는 401 또는 403 JSON 오류, 비공개 기록 없음',{method:'GET'},denied);
+      const recordsIndex=results.findIndex(item=>item.attackId==='live_instructor_update');
+      if(recordsIndex>=0)results[recordsIndex]={attackId:'live_operations_records',expected:'새 기록 테이블 적용 후 정상·금지 요청의 HTTP/요청 ID/시각과 화면 수치 대조',
+        observed:'미실행: step12_operations.sql 적용과 승인된 앱의 실제 기록·수치 대조는 사용자 실행이 필요합니다. 로컬 HTTP/SQL/화면 시험과 구분합니다.'};
+      const assaultIndex=results.findIndex(item=>item.attackId==='live_direct_grants');
+      if(assaultIndex>=0)results[assaultIndex]={attackId:'judge_assault_41',expected:'제공 ALEPH SDP 엔진·심판의 공식 41종 집행 결과',
+        observed:'미실행: 공식 종별 명세·결과 수신 계약이 없어 실행 확인 0/41입니다. 자체 점검 20개를 총공세 통과로 처리하지 않습니다.'};
     }
     return results;
   }
