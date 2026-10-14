@@ -65,6 +65,18 @@ test('approval cannot be requested as true; separate browser cannot reuse it; re
  assert.equal((await request('authenticate',b)).result.code,403);
  const checked=(await request('authenticate',a)).result;
  assert.equal(checked.code,200);assert.equal(checked.body.deviceRegistered,true);
+ const issuedAt=Date.now();
+ const expires=Date.parse(checked.body.expiresAt);
+ assert.ok(expires-issuedAt>8*60*60000-10000 && expires-issuedAt<=8*60*60000);
+ const originalNow=Date.now;
+ try {
+  Date.now=()=>expires-1;
+  const gateRequest={req:{headers:{'x-vault-device-grant':checked.body.grant}},res:res(),user:{kind:'student',userId:A}};
+  assert.equal(await gate(gateRequest),true);
+  Date.now=()=>expires;
+  assert.equal(await gate(gateRequest),false);
+  assert.equal(gateRequest.res.code,403);
+ } finally { Date.now=originalNow; }
  assert.equal((await read(checked.body.grant)).code,200);
  assert.equal((await read('A'.repeat(43))).code,403);
  store.tables.vault_app_credentials[0].approved=false;

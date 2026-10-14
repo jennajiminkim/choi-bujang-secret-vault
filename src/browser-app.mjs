@@ -212,7 +212,7 @@ el('check-device-button').addEventListener('click', async () => {
     if(version!==generation||!signedIn)return;
     if(result.deviceRegistered!==true || typeof result.grant!=='string') throw new Error('서버가 기기를 확인하지 못했습니다.');
     const lifetime=Date.parse(result.expiresAt)-Date.now();
-    if(!Number.isFinite(lifetime)||lifetime<=0||lifetime>5*60000)throw new Error('기기 확인이 만료됐습니다.');
+    if(!Number.isFinite(lifetime)||lifetime<=0||lifetime>8*60*60000)throw new Error('기기 확인이 만료됐습니다.');
     deviceGrant=result.grant; // RAM only; never localStorage, IndexedDB, cookies or Cache.
     el('workspace').hidden=false;
     el('device-status').textContent='서버 승인과 인증 수단 소유 확인 완료. 자료실을 사용할 수 있습니다.';

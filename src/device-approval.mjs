@@ -85,7 +85,7 @@ export function createDeviceHandler({config,supabase,mode,judgeKeySet}) {
    const {data:c,error:ce}=await supabase.from('vault_app_credentials').select('approved,public_key').eq('credential_id',credentialId).eq('owner_id',user.userId).maybeSingle();
    if(ce)throw Error('setup');
    if(!c||c.approved!==true||c.public_key!==body.publicKey)return json(res,403,'현재 앱의 승인 대기 중입니다. 운영자 승인 후 다시 확인하세요.','device_not_registered');
-   const grant=randomBytes(32).toString('base64url'),expiresAt=new Date(Date.now()+5*60000).toISOString();
+   const grant=randomBytes(32).toString('base64url'),expiresAt=new Date(Date.now()+8*60*60000).toISOString();
    const {error:ge}=await supabase.from('vault_app_grants').insert({grant_hash:sha(grant),owner_id:user.userId,credential_id:credentialId,expires_at:expiresAt});
    if(ge)throw Error('setup');
    return res.status(200).json({status:'approved',deviceId,deviceRegistered:true,grant,expiresAt});
