@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('현재 자기 점검은 5~10단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('현재 자기 점검은 5~11단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
