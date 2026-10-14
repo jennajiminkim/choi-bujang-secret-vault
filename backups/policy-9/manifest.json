@@ -1,0 +1,30 @@
+{
+  "schema": "vault.safe-policy.v1",
+  "sourceCommit": "97324e69b84da03d79b346923abb614688e146d3",
+  "verifiedBy": "user_reported_stage9_judge_success",
+  "restoreScope": [
+    "src/notes-api.mjs"
+  ],
+  "files": [
+    {
+      "path": "src/notes-api.mjs",
+      "sha256": "4afa74c17e6dd823c64ae79e6f83e0e330cf75079945b26373092d5c74f3f475"
+    },
+    {
+      "path": "src/verify-login.mjs",
+      "sha256": "c8fa6842c7904f9430e002bd92207d4aef9d54739a712f716153a2cb96e7389b"
+    },
+    {
+      "path": "src/resources.mjs",
+      "sha256": "70ba86a26ae37e7a04c8bf9c50ec1dfac981dda93e97ae930453d10ec4fbd84c"
+    },
+    {
+      "path": "src/decider.mjs",
+      "sha256": "38f8b2911d8bcabe4959ddb7a1defc503f38221d5650b11e86b31415c25cc358"
+    },
+    {
+      "path": "src/access-signals.mjs",
+      "sha256": "27b068da9a1a2458ce217c66eda356674e5ffe4ed81c7df24ec9ec82d48a75db"
+    }
+  ]
+}

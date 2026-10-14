@@ -19,7 +19,9 @@
     "test:stage5": "node --test test/stage3.test.mjs test/stage4-rls.test.mjs test/stage5-grants.test.mjs test/r5.test.mjs",
     "test:stage8": "node --test test/stage3.test.mjs test/stage6.test.mjs test/stage7.test.mjs test/stage8.test.mjs test/r5.test.mjs",
     "test:stage9": "node --test test/stage9.test.mjs",
-    "test:recovery": "node --test test/note-recovery.test.mjs"
+    "test:recovery": "node --test test/note-recovery.test.mjs",
+    "policy:restore": "node scripts/policy-restore.mjs",
+    "test:stage10": "node --test test/policy-recovery.test.mjs test/note-recovery.test.mjs"
   },
   "engines": {
     "node": ">=22"

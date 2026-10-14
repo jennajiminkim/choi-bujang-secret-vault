@@ -5,8 +5,8 @@ import { deploymentIdentity } from './deployment-identity.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const config = JSON.parse(await readFile(resolve(root, 'aleph.config.json'), 'utf8'));
-if (![5, 6, 7, 8, 9].includes(config.step)) {
-  throw new Error('현재 빌드는 5~9단계 서버 자료 요청 흐름을 기대합니다. aleph.config.json의 step을 확인하세요.');
+if (![5, 6, 7, 8, 9, 10].includes(config.step)) {
+  throw new Error('현재 빌드는 5~10단계 서버 자료 요청 흐름을 기대합니다. aleph.config.json의 step을 확인하세요.');
 }
 
 await mkdir(resolve(root, 'public'), { recursive: true });

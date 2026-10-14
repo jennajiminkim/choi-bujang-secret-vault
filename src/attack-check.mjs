@@ -4,7 +4,7 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
-  if (![5, 6, 7, 8, 9].includes(config.step)) throw new Error('현재 자기 점검은 5~9단계에 맞춰져 있습니다.');
+  if (![5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('현재 자기 점검은 5~10단계에 맞춰져 있습니다.');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
@@ -90,7 +90,7 @@ export async function runAttackChecks(config) {
       observed:`로컬 ${bulk.decision}; 규칙 ${bulk.ruleIds.join(',')}; ${bulk.decision==='deny' && bulk.ruleIds.includes('zone_notes_no_bulk')?'일치':'불일치'}; 소유자 비교는 최종 API가 수행`});
     results.push({attackId:'live_step_up_flow',expected:'운영 엔진에서 새 로그인 검증 전 자료 차단, 재검증 후 요청 허용',
       observed:'미실행: 실제 재로그인·확인 요청 연결 계약이 없어 로컬 가상 사건만 시험했습니다.'});
-    if (config.step === 9) {
+    if (config.step >= 9) {
       const { checkDetection } = await import('../scripts/detect-test.mjs');
       const { detect } = await import('./detect.mjs');
       const checks = await checkDetection(detect);
@@ -100,6 +100,23 @@ export async function runAttackChecks(config) {
       results[results.findIndex(item => item.attackId === 'live_step_up_flow')] = {
         attackId:'live_device_revocation', expected:'심판의 복합 의심 기기 한 개 회수·정상 기기 유지 및 경과 시간 측정',
         observed:'미실행: 학생 함수는 회수 제안만 반환하며 실제 집행·시간 측정은 심판이 수행합니다.' };
+    }
+    if (config.step === 10) {
+      // Keep the submission limit at 20: replace unrelated live teacher/grant placeholders.
+      const { rehearsePolicyRestore } = await import('../scripts/policy-restore.mjs');
+      const trial = await rehearsePolicyRestore();
+      results[results.findIndex(item => item.attackId === 'live_instructor_update')] = {
+        attackId:'local_policy_recovery', expected:'사전 사본 재검증 후 격리 정책 복원: A 정상 200, B의 A 요청 404, 다른 규칙·감사 보존',
+        observed:`로컬 복원 전 B→A ${trial.beforeB}; 복원 후 A→A ${trial.afterA}, B→A ${trial.afterB}; 다른 서비스·감사 보존 ${trial.preserved}; 운영 정책 변경 없음` };
+      // User's manual observation is attributed, never an automated live claim.
+      results[results.findIndex(item => item.attackId === 'live_direct_grants')] = {
+        attackId:'user_reported_note_restore', expected:'B의 지정한 한 건 백업 재검증·복원, 원래 내용 유지',
+        observed:'사용자 확인(2026-10-14): 사전 백업 201, 재검증 200·verified true, 복원 뒤 화면에서 원래 내용, 재검증 200·verified true. 자동 운영 시험 아님; 실제 ID·본문·해시 제외' };
+      // Use a real anonymous POST, not a fabricated restore result.
+      const index=results.findIndex(item => item.attackId === 'browser_public_key');
+      results.splice(index,1);
+      await check('anonymous_note_restore','/api/note-restores','익명 POST 복원은 401 또는 403 JSON 오류',
+        {method:'POST'},denied);
     }
     return results;
   }
