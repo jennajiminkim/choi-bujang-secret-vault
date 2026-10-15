@@ -1,6 +1,16 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDeepStrictEqual } from 'node:util';
+
+// These expected results are plain objects containing only string fields.
+// Compare all enumerable own keys and exact values, independent of key order.
+function sameDetectionResult(actual, expected) {
+  if (!actual || typeof actual !== 'object'
+      || Object.getPrototypeOf(actual) !== Object.getPrototypeOf(expected)) return false;
+  const keys = Reflect.ownKeys(actual).filter(key => Object.prototype.propertyIsEnumerable.call(actual, key));
+  const expectedKeys = Object.keys(expected);
+  return keys.length === expectedKeys.length && expectedKeys.every(key =>
+    Object.prototype.propertyIsEnumerable.call(actual, key) && Object.is(actual[key], expected[key]));
+}
 
 const START = Date.UTC(2026, 9, 1, 0, 0, 0);
 const subject = 'learner_fixture';
@@ -32,7 +42,7 @@ export async function checkDetection(detect) {
   const results = [];
   for (const item of cases) {
     const actual = await detect(item.events);
-    const passed = isDeepStrictEqual(actual, item.expected);
+    const passed = sameDetectionResult(actual, item.expected);
     results.push({ name: item.name, passed: Boolean(passed) });
   }
   return results;
