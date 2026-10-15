@@ -24,7 +24,7 @@ const check = (input, output) => output && typeof output === 'object'
   && ['allow', 'deny', 'step_up'].includes(output.decision)
   && typeof output.reasonCode === 'string' && Array.isArray(output.ruleIds);
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (typeof process !== 'undefined' && process?.argv?.[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const { normal, suspicious } = fixtureRequests();
     const { decide } = await import('../src/decider.mjs');

@@ -48,7 +48,7 @@ export async function checkDetection(detect) {
   return results;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (typeof process !== 'undefined' && process?.argv?.[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const { detect } = await import('../src/detect.mjs');
     const results = await checkDetection(detect);
