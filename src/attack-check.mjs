@@ -1,4 +1,5 @@
-import publicConfig from '../public/auth-config.json' with { type: 'json' };
+import { readFileSync } from 'node:fs';
+const publicConfig = JSON.parse(readFileSync(new URL('../public/auth-config.json', import.meta.url), 'utf8'));
 import { decide } from './decider.mjs';
 import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
