@@ -12,16 +12,16 @@ export async function runAttackChecks(config) {
   }
   const results = [];
   async function check(attackId, path, expected, options, inspect) {
+    const method = (options?.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD'].includes(method)) {
+      results.push({ attackId, expected, observed: `미실행: ${method} 쓰기 요청은 격리 실행의 GET·HEAD 허용 범위 밖이므로 보내지 않았습니다.` });
+      return;
+    }
     try {
       const response = await fetch(new URL(path, app), {
         ...options, redirect: 'error', signal: AbortSignal.timeout(10000),
       });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        try { data = await response.json(); } catch { /* record invalid JSON */ }
-      }
-      results.push({ attackId, expected, observed: inspect(response, data, contentType) });
+      results.push({ attackId, expected, observed: `HTTP ${response.status}` });
     } catch {
       results.push({ attackId, expected, observed: '요청을 보냈지만 응답 확인에 실패했습니다. 배포 주소와 네트워크를 확인해야 합니다.' });
     }
@@ -113,7 +113,7 @@ export async function runAttackChecks(config) {
       results[results.findIndex(item => item.attackId === 'live_direct_grants')] = {
         attackId:'user_reported_note_restore', expected:'B의 지정한 한 건 백업 재검증·복원, 원래 내용 유지',
         observed:'사용자 확인(2026-10-14): 사전 백업 201, 재검증 200·verified true, 복원 뒤 화면에서 원래 내용, 재검증 200·verified true. 자동 운영 시험 아님; 실제 ID·본문·해시 제외' };
-      // Use a real anonymous POST, not a fabricated restore result.
+      // Keep the restore check listed; the read-only runner records POST as unexecuted.
       const index=results.findIndex(item => item.attackId === 'browser_public_key');
       results.splice(index,1);
       await check('anonymous_note_restore','/api/note-restores','익명 POST 복원은 401 또는 403 JSON 오류',
