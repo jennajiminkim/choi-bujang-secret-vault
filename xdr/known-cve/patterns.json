@@ -1,0 +1,31 @@
+[
+  {
+    "name": "Log4Shell 원격 조회 구문",
+    "condition": "요청 머리글·URL·인자에 완전한 ${jndi:원격프로토콜://대상} 형태가 있고 수준 10 이상과 T1190 근거가 함께 있으면 block 후보. 낮은 수준·근거 누락·불완전 구문은 alert만 한다.",
+    "evidence": "CVE-2021-44228은 로그 메시지·인자의 공격자 제어 LDAP 등 JNDI 조회로 원격 코드 실행이 가능한 취약점이다.",
+    "sources": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+      "https://www.cve.org/CVERecord?id=CVE-2021-44228"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "alertLevel": 5
+    }
+  },
+  {
+    "name": "취약점 점검 흔적",
+    "condition": "수준 5 이상 T1190 경보에서 취약점 점검 도구·탐색 흔적 요약이 있으면 alert. 도구 이름만으로 block하지 않는다. 완전한 악용 구문은 첫 패턴으로 평가한다.",
+    "evidence": "MITRE T1190은 공개 앱 취약점 악용과 관련 요청·로그의 이상 징후를 설명하며 탐색 흔적만으로 악용 성공을 증명하지 않는다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1190/"
+    ]
+  },
+  {
+    "name": "알려진 취약점 의심 신호",
+    "condition": "완전한 원격 조회 구문이 없어도 수준 5 이상 T1190 경보이거나 요청에 CVE-2021-44228·Log4Shell·JNDI 의심 표기가 있으면 alert. 일반 이벤트는 record.",
+    "evidence": "CVE-2021-44228의 핵심은 JNDI 조회이므로 취약점 이름이나 단어 검색만으로 원격 코드 실행을 확정할 수 없다.",
+    "sources": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+    ]
+  }
+]
