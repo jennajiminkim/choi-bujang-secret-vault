@@ -48,8 +48,7 @@ export async function runAttackChecks(config) {
   if (original.protocol !== 'https:' || original.origin !== provider.origin || original.pathname !== '/rest/v1/notes' || original.username || original.password || original.search || original.hash) {
     throw new Error('쿼리 없는 원본 자료 HTTPS 경로를 확인해 주세요.');
   }
-  original.searchParams.set('select', 'id'); original.searchParams.set('limit', '1');
-  await check('direct_anon_data_api', original.href,
+  await check('direct_anon_data_api', original.href + '?select=id&limit=1',
     '로그인 토큰 없이 공개용 키만 보낸 직접 Data API는 401 또는 403 JSON 오류',
     { headers: { apikey: publicConfig.publishableKey } },
     (r, d) => `HTTP ${r.status}; JSON 권한 오류 ${d?.code === '42501' ? '있음' : '확인 필요'}; ${[401, 403].includes(r.status) && d?.code === '42501' ? '기대 결과 일치' : '기대 결과 불일치'}`);
