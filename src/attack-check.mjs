@@ -6,6 +6,29 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
   if (![5, 6, 7, 8, 9, 10, 11, 12].includes(config.step)) throw new Error('현재 자기 점검은 5~12단계에 맞춰져 있습니다.');
+  if (config.step === 12) {
+    // The bundle declares unexecuted checks; actual API evidence stays in the recapture table.
+    const checks = [
+      ['public_app', '접속 앱공개 화면 GET /: 200'],
+      ['own_notes_list', '본인 메모 목록 GET /api/notes: 200'],
+      ['own_note_read', '본인 메모 한 건 GET /api/notes/:id: 200'],
+      ['anonymous_notes', '익명 GET /api/notes: 401 또는 403'],
+      ['foreign_note_read', '다른 계정 메모 GET /api/notes/:id: 404'],
+      ['unregistered_device', '기기 확인값 없는 GET /api/notes: 403'],
+      ['backup_verify', '본인 사전 백업 GET /api/note-backups?backupId=:id: 200 및 사본 검증'],
+      ['own_note_update', '본인 메모 PUT /api/notes/:id: 200'],
+      ['student_notice_update', '학생 공지 수정 PUT /api/notices/:id: 403'],
+      ['engine_step_up', '제공 엔진의 복합 이상 step_up 및 새 로그인 검증 후 허용'],
+      ['engine_revocation', '복합 탐지 propose_revocation 및 엔진 회수 확인, 정상 기기 유지'],
+      ['note_restore', 'B 시험 메모 한 건 POST /api/note-restores: 200 및 복원 검증'],
+      ['judge_assault_41', '공식 41종 시험: 심판 집행 결과 필요'],
+    ];
+    return checks.map(([attackId, expectation]) => ({
+      attackId,
+      expected: `${expectation}. 미실행 이유: 12단계 번들은 HTTP 요청과 로컬 연습을 실행하지 않습니다. 실제 API 결과는 탈환 작전실 recapture:table에서 별도로 확인하며 엔진·41종 결과는 수신 전입니다.`,
+      observed: 'not_run',
+    }));
+  }
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
