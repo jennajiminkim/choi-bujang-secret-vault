@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-const publicConfig = JSON.parse(readFileSync(new URL('../public/auth-config.json', import.meta.url), 'utf8'));
-import { decide } from './decider.mjs';
-import { fixtureRequests } from '../scripts/fixture-7.mjs';
 // Distinguish actual HTTP observations from local simulated policy checks.
 // Never include tokens, device keys, subject IDs or note bodies.
 export async function runAttackChecks(config) {
@@ -29,6 +25,11 @@ export async function runAttackChecks(config) {
       observed: 'not_run',
     }));
   }
+  // Only steps 5–11 load the HTTP and local-practice dependencies.
+  const { readFileSync } = await import('node:fs');
+  const publicConfig = JSON.parse(readFileSync(new URL('../public/auth-config.json', import.meta.url), 'utf8'));
+  const { decide } = await import('./decider.mjs');
+  const { fixtureRequests } = await import('../scripts/fixture-7.mjs');
   const app = new URL(config.publicAppUrl);
   if (app.protocol !== 'https:' || app.username || app.password || app.pathname !== '/' || app.search || app.hash) {
     throw new Error('aleph.config.json의 실제 배포 주소를 확인해 주세요.');
