@@ -47,7 +47,7 @@ export function mountOperations({request,isActive,protectedRequest}) {
   }
   el('ops-case').value=data.cases.some(c=>c.id===selected)?selected:data.cases[0].id;selection();
   const table=el('ops-table');table.replaceChildren();
-  cells(table,['단계','요청/검증','기대','실제 결과','출처','API 요청 ID / 점검 ID','확인 시각'],true);
+  cells(table,['단계','정상·금지 요청','기대 결과','실제 API 결과','출처','요청 ID','확인 시각'],true);
   for(const check of data.cases){
    const records=data.checks.records.filter(r=>r.case_id===check.id);
    if(!records.length)cells(table,[check.stages,`${check.label} (${check.method} ${check.path})`,check.expected.join(' / '),check.mode==='engine'?'엔진 확인 필요':check.mode==='editor'?'수정 API 기록 없음':check.mode==='restore'?'복원 API 기록 없음':'미실행',check.mode==='engine'?'제공 엔진 결과 미수신':'현재 서버 기록 없음','없음','없음']);
