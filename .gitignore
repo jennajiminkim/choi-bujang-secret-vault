@@ -15,3 +15,6 @@ xdr/web-injection/*.tmp
 xdr/known-cve/deny-rules.json
 xdr/known-cve/replay-deny-rules.json
 xdr/known-cve/*.tmp
+xdr/persistence/deny-rules.json
+xdr/persistence/replay-deny-rules.json
+xdr/persistence/*.tmp

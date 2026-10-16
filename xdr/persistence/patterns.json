@@ -1,0 +1,40 @@
+[
+  {
+    "name": "낯선 서비스 등록·변경",
+    "condition": "T1543 계열 경보에서 새 서비스·실행 파일 변경과 서명 없음 또는 평소 목록 이탈이 확인되고 임시 실행 경로가 겹칠 때, 수준 10 이상이면 block 후보. 경로가 없어도 서명 없는 서비스 등록 집계 3건 이상은 후보. 서명 미확인은 서명 없음으로 바꾸지 않는다.",
+    "evidence": "MITRE T1543은 서비스를 만들거나 변경하여 재시작 뒤에도 악성 프로그램을 실행하는 지속성 기법을 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1543/"
+    ],
+    "thresholds": {
+      "highLevel": 10,
+      "alertLevel": 5,
+      "minRepeat": 3
+    }
+  },
+  {
+    "name": "낯선 예약 작업",
+    "condition": "T1053 계열에서 새롭거나 임의 이름의 예약 작업이 임시 경로의 실행 파일을 가리키거나, 시작 프로그램과 예약 작업이 같은 임시 파일을 가리키며 수준 10 이상이면 block 후보. 수업 시각의 작업·서명 미확인만 있으면 alert.",
+    "evidence": "MITRE T1053은 예약 작업을 이용한 반복 실행과 지속성을 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1053/"
+    ]
+  },
+  {
+    "name": "시작 폴더의 미등록 프로그램",
+    "condition": "실제 Startup 경로에 평소 목록에 없는 실행 파일이 추가된 무결성 경보이며 수준 10 이상이면 block 후보. 변경만 있거나 목록·실행 파일 근거가 없으면 alert. 수집기의 T1543 표기는 시작 폴더 기법 자체의 분류로 간주하지 않는다.",
+    "evidence": "MITRE T1547.001은 시작 폴더에 프로그램을 추가해 로그인 때 실행하는 지속성 기법을 설명한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1547/001/"
+    ]
+  },
+  {
+    "name": "지속성 의심 변경",
+    "condition": "수준 5 이상 T1543·T1053·T1547.001 경보 또는 시작 폴더 변경은 근거가 부족하면 alert. 저수준의 기존·서명된 서비스·일상 작업·읽기만 한 이벤트는 record.",
+    "evidence": "MITRE T1543·T1053의 서비스·작업 생성 및 변경을 조사하되 정상 관리 작업과 구분해야 한다.",
+    "sources": [
+      "https://attack.mitre.org/techniques/T1543/",
+      "https://attack.mitre.org/techniques/T1053/"
+    ]
+  }
+]
