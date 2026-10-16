@@ -21,3 +21,6 @@ xdr/persistence/*.tmp
 xdr/privilege/deny-rules.json
 xdr/privilege/replay-deny-rules.json
 xdr/privilege/*.tmp
+xdr/exfiltration/deny-rules.json
+xdr/exfiltration/replay-deny-rules.json
+xdr/exfiltration/*.tmp
