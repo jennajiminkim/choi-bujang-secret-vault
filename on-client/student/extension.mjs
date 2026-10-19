@@ -79,7 +79,50 @@ export function createStudentView() {
       });
       return root;
     },
-    renderDecision() { return '학생 구현 대기: 서버의 판정과 이유를 연결하세요.'; },
+    renderDecision({ status, mode, data, error, appId } = {}) {
+      const root = document.createElement('div');
+      const line = value => {
+        const element = document.createElement('p');
+        element.textContent = value;
+        root.appendChild(element);
+      };
+      const value = input => typeof input === 'string' && input.length > 0
+        ? input : '확인 불가';
+      switch (mode) {
+        case 'connected': break;
+        case 'demo': line('예제 자료 (demo)'); break;
+        case 'disconnected': line('연결 없음 (disconnected)'); break;
+        default: line('연결 상태 확인 불가 (unknown)'); break;
+      }
+      // 요청 실패·대기 중에는 이전 data의 판정·이유·시각을 표시하지 않습니다.
+      line(`업무 앱 ID: ${value(status === 'ok' ? data?.appId : appId)}`);
+      if (status === 'idle') {
+        line('업무 앱을 선택하고 접근을 요청하세요.');
+      } else if (status === 'loading') {
+        line('접근 판정 확인 중');
+      } else if (status === 'error') {
+        line(`접근 요청 실패: ${value(error?.message)}`);
+        line('요청 실패는 접근 거부 판정이 아닙니다. 접근 허용 여부는 확인할 수 없습니다.');
+      } else if (status === 'ok') {
+        switch (data?.decision) {
+          case 'allow':
+            line('접근 허용 (allow)');
+            line('정책상 접근 허용이며 실제 업무 앱 접속 성공을 보장하지 않습니다.');
+            break;
+          case 'deny': line('접근 거부 (deny)'); break;
+          case 'challenge':
+            line('추가 인증 또는 확인 필요 (challenge)');
+            line('이 앱은 추가 인증이나 확인 절차를 대신 수행하지 않습니다.');
+            break;
+          default: line('판정 확인 불가 (unknown)'); break;
+        }
+        line(`판정 이유: ${value(data?.reason)}`);
+        line(`판정 시각: ${value(data?.checkedAt)}`);
+      } else {
+        line('판정 확인 불가 (unknown)');
+      }
+      return root;
+    },
     renderEvents() { return '학생 구현 대기: 본인 접속·XDR 기록을 연결하세요.'; },
     renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
