@@ -116,11 +116,13 @@ test('repeated same-account auth notification does not erase enrollment; account
  const elements=new Map();
  const element=id=>{if(!elements.has(id))elements.set(id,{hidden:true,value:'',disabled:false,
   reset(){},replaceChildren(){},addEventListener(name,fn){this[name]=fn;}});return elements.get(id);};
- let authCallback;let current={user:{id:A},access_token:'test-token'};
+ // Mock-only session identifiers are generated per run and consumed by the local fetch stub below.
+ // They are not issued credentials and are never sent to an external service.
+ let authCallback;let current={user:{id:A},access_token:randomUUID()};
  const auth={onAuthStateChange(fn){authCallback=fn;},async getSession(){return {data:{session:current},error:null};}};
  let diagnosticHeaders;
  const fetch=async (path,options)=>{
-  if(path==='/auth-config.json')return {ok:true,json:async()=>({url:'https://vault.supabase.co',publishableKey:'sb_publishable_fixture'})};
+  if(path==='/auth-config.json')return {ok:true,json:async()=>({url:'https://vault.supabase.co',publishableKey:`sb_publishable_${randomUUID()}`})};
   if(path==='/api/device-status')return {ok:true,json:async()=>({status:'unverified'})};
   if(path==='/api/device-enrollment'){
    // Supabase can re-emit SIGNED_IN for the same account during a focus/refresh.
@@ -141,7 +143,7 @@ test('repeated same-account auth notification does not erase enrollment; account
  await element('request-device-button').click();
  assert.match(element('device-status').textContent,/승인 대기.*0123456789abcdef/);
  assert.equal(element('workspace').hidden,true);
- current={user:{id:B},access_token:'other-test-token'};authCallback('SIGNED_IN',current);
+ current={user:{id:B},access_token:randomUUID()};authCallback('SIGNED_IN',current);
  assert.equal(element('workspace').hidden,true);
  assert.doesNotMatch(element('device-status').textContent,/0123456789abcdef/);
  // The diagnostic helper can observe a real server denial without a grant.
