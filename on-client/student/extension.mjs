@@ -390,6 +390,30 @@ export function createStudentView() {
         text(parent, 'p', retry);
       };
       modeLine(root, mode);
+      // 학습용 설명만 표시합니다. PC 값은 이 함수의 입력에 없으므로 수치·시각을 생성하지 않습니다.
+      const pcGuide = text(root, 'details', '');
+      text(pcGuide, 'summary', 'PC 수치 읽는 법');
+      text(pcGuide, 'p', '학생 작성 설명 · 실측 결과나 AI 분석이 아닙니다. 실제 값은 제공 영역 「내 PC 상태」의 「내 PC 확인」으로 조회하세요. 이 설명은 값을 수집하거나 자동 요청하지 않습니다.');
+      const guideTable = text(pcGuide, 'table', '');
+      text(guideTable, 'caption', '제공 PC 조회 값의 의미·단위·시각');
+      const guideHead = text(text(guideTable, 'thead', ''), 'tr', '');
+      for (const heading of ['항목', '뜻과 단위', '측정·비교할 때']) text(guideHead, 'th', heading).setAttribute('scope', 'col');
+      const guideBody = text(guideTable, 'tbody', '');
+      for (const [name, meaning, comparison] of [
+        ['CPU 사용률', '약 200ms 구간의 전체 CPU 시간 대비 사용 비율(%)입니다.', '작업 관리자와 가까운 시각에 비교하세요. 표본 구간·갱신 주기가 달라 수치가 정확히 같을 필요는 없습니다.'],
+        ['메모리 사용량', '사용량 / 전체 용량입니다. 제공 화면은 GB로 표시하지만 계산 기준은 1,073,741,824바이트(1GiB)입니다.', '캐시·예약 메모리 등 집계 방식에 따라 작업 관리자와 차이가 날 수 있습니다. 같은 범위·단위인지 먼저 확인하세요.'],
+        ['디스크 남은 공간', '현재 앱 폴더가 있는 디스크의 여유 공간 / 전체 용량입니다. 제공 화면의 GB는 1024³바이트 기준입니다.', '파일 탐색기의 같은 드라이브와 비교하세요. 메모리와 달리 앞 숫자는 사용량이 아니라 여유 공간입니다.']
+      ]) {
+        const row = text(guideBody, 'tr', '');
+        text(row, 'th', name).setAttribute('scope', 'row');
+        text(row, 'td', meaning);
+        text(row, 'td', comparison);
+      }
+      text(pcGuide, 'h4', '시각과 확인 불가 읽기');
+      text(pcGuide, 'p', '제공 카드 위 「이 PC 마지막 실측」은 응답을 만든 시각(measuredAt)입니다. 세 항목이 정확히 같은 순간에 측정됐다는 뜻은 아니며 항목별 시각은 별도로 제공되지 않습니다. 이 학생 설명에는 현재 PC 값과 측정 시각이 전달되지 않습니다.');
+      text(pcGuide, 'p', '읽지 못한 값은 확인 불가와 표시된 이유(읽기 권한 없음·시간 초과·미지원·조회 실패)를 확인하세요. 0이나 정상으로 바꾸지 말고 예시 값으로 채우지 않습니다. 관리자 권한 실행이나 권한 변경은 이 절차에서 요청하지 않습니다.');
+      text(pcGuide, 'h4', '실측과 예시 자료 구분');
+      text(pcGuide, 'p', '내 PC 상태는 제공된 로컬 실측 기능입니다. demo 계정·기기·세션·event-01 기록은 예시 자료이며 실제 PC 측정 결과가 아닙니다. PC 실측 성공은 SDP 연결·AI 설명 성공이나 PC 안전을 보장하지 않습니다.');
       const recovery = text(root, 'section', '');
       text(recovery, 'h3', '자료 연결과 다시 시도');
       text(recovery, 'p', '이 영역은 기기·세션·기록 알림의 조회 상태입니다. AI 모델 응답 점검과 별개이며, AI 점검 성공만으로 이 자료가 연결되지는 않습니다.');
