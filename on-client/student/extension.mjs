@@ -51,6 +51,46 @@ export function createStudentView() {
           text(container, 'p', '확인 불가');
         }
       };
+      const overview = text(root, 'section', '');
+      overview.setAttribute('aria-label', 'nævis 상태 요약');
+      text(overview, 'h3', 'nævis 상태 요약');
+      text(overview, 'p', '전달받은 계정·기기·세션 조회 결과입니다. PC 악성코드 검사 결과가 아니며 AI 연결 점검과는 별개입니다.');
+      const cards = text(overview, 'div', '');
+      cards.classList.add('grid-2');
+      const provenance = input => input?.mode === 'demo'
+        ? '예시 자료 · 실제 조회 결과 아님 (demo)'
+        : input?.mode === 'connected' ? '연동 자료 (connected)'
+        : input?.mode === 'disconnected' ? '연결 없음 (disconnected)' : '자료 출처 확인 불가 (unknown)';
+      const card = (title, input, render) => {
+        const panel = text(cards, 'section', '');
+        panel.classList.add('card');
+        text(panel, 'h4', title);
+        text(panel, 'p', provenance(input));
+        if (input?.status === 'loading') text(panel, 'p', '불러오는 중');
+        else if (input?.status === 'error') text(panel, 'p', `조회 실패 · 확인 불가: ${value(input.error?.message)}`);
+        else if (input?.status === 'ok') render(panel, input.data);
+        else text(panel, 'p', '확인 불가 · 현재 조회 결과 없음');
+      };
+      card('사용자', me, (panel, data) => {
+        text(panel, 'p', value(data?.user?.label));
+        text(panel, 'p', `사용자 ID: ${value(data?.user?.id)}`);
+      });
+      card('현재 기기', me, (panel, data) => {
+        text(panel, 'p', deviceLine(data?.device));
+      });
+      card('현재 세션', me, (panel, data) => {
+        text(panel, 'p', sessionLine(data?.session));
+      });
+      const connectionCard = text(cards, 'section', '');
+      connectionCard.classList.add('card');
+      text(connectionCard, 'h4', '계정·기기·세션 자료 연결');
+      for (const [name, input] of [['계정', me], ['기기 목록', devices], ['현재 세션 목록', sessions]]) {
+        const state = input?.status === 'loading' ? '불러오는 중'
+          : input?.status === 'error' ? '조회 실패'
+          : input?.status === 'ok' ? '응답 수신' : '확인 불가';
+        text(connectionCard, 'p', `${name}: ${state} · ${provenance(input)}`);
+      }
+      text(connectionCard, 'p', '연결 실패 시 위쪽 「다시 불러오기」 버튼으로 직접 재시도하세요. AI 연결 여부는 AI 연결 점검 영역에서 확인하세요.');
       section('현재 계정·기기·세션', me, (container, data) => {
         text(container, 'p', `사용자 이름: ${value(data?.user?.label)}`);
         text(container, 'p', `사용자 ID: ${value(data?.user?.id)}`);
@@ -140,16 +180,17 @@ export function createStudentView() {
         : kind === 'xdr' ? 'XDR 경보 (xdr)' : '확인 불가 (unknown)';
       switch (mode) {
         case 'connected': break;
-        case 'demo': text(root, 'p', '예제 자료 (demo)'); break;
+        case 'demo': text(root, 'p', '예시 자료 · 실제 조회 결과 아님 (demo)'); break;
         case 'disconnected': text(root, 'p', '연결 없음 (disconnected)'); break;
         default: text(root, 'p', '연결 상태 확인 불가 (unknown)'); break;
       }
       if (status === 'loading') {
-        text(root, 'p', '기록을 불러오는 중');
+        text(root, 'p', '기록을 불러오는 중 · 추이 집계 대기');
         return root;
       }
       if (status === 'error') {
         text(root, 'p', `기록을 불러오지 못했습니다: ${value(error?.message)}`);
+        text(root, 'p', '기록 추이: 조회 불가. 조회 실패는 기록 0건을 뜻하지 않습니다. 위쪽 「다시 불러오기」 버튼을 직접 누르세요.');
         if (error?.code === 'CONTRACT_MISMATCH') {
           text(root, 'p', '확인 불가: 기록 응답 형식이 입력 계약과 일치하지 않습니다.');
         }
@@ -161,6 +202,7 @@ export function createStudentView() {
       }
       if (data.length === 0) {
         text(root, 'p', '표시할 기록이 없습니다');
+        text(root, 'p', '받은 기록 0건 · 추이를 계산할 자료가 없습니다. 전체 이력이 없다는 뜻은 아닙니다.');
         return root;
       }
       const records = [...data].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -198,6 +240,58 @@ export function createStudentView() {
       const kindFilter = makeFilter('기록 종류', records.map(event => event.kind), kindLabel);
       const appFilter = makeFilter('업무 앱', records.map(event => event.appId), appLabel);
       const accessFilter = makeFilter('접속 상태', records.map(event => event.state?.access), accessLabel);
+      const trend = text(root, 'section', '');
+      trend.setAttribute('aria-label', '받은 기록의 날짜별 추이');
+      text(trend, 'h3', '받은 기록의 날짜별 추이');
+      text(trend, 'p', '현재 필터에 해당하는 받은 기록만 한국 시각(Asia/Seoul) 날짜로 집계합니다. 최근 최대 40건의 일부 이력이며, 기록이 없는 날짜를 0건으로 채우지 않습니다.');
+      const trendBody = text(trend, 'div', '');
+      const dateKey = at => {
+        if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null;
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(new Date(at));
+        const get = type => parts.find(part => part.type === type)?.value;
+        return `${get('year')}-${get('month')}-${get('day')}`;
+      };
+      const drawTrend = shown => {
+        trendBody.replaceChildren();
+        const days = new Map();
+        let missing = 0;
+        for (const event of shown) {
+          const day = dateKey(event.at);
+          if (!day) { missing++; continue; }
+          const counts = days.get(day) || { access: 0, xdr: 0, other: 0, total: 0 };
+          counts.total++;
+          if (event.kind === 'access') counts.access++;
+          else if (event.kind === 'xdr') counts.xdr++;
+          else counts.other++;
+          days.set(day, counts);
+        }
+        if (missing) text(trendBody, 'p', `시각 확인 불가 ${missing}건은 날짜별 집계에서 제외했습니다. 목록에는 유지합니다.`);
+        if (days.size === 0) {
+          text(trendBody, 'p', '현재 필터에서 날짜별 추이를 계산할 기록이 없습니다.');
+          return;
+        }
+        const maximum = Math.max(...Array.from(days.values(), day => day.total));
+        const table = text(trendBody, 'table', '');
+        text(table, 'caption', '날짜별 받은 기록 건수 · 필터 적용 결과');
+        const head = text(text(table, 'thead', ''), 'tr', '');
+        for (const label of ['한국 시각 날짜', '접속 기록', 'XDR 경보', '기타·확인 불가', '합계·상대 크기']) {
+          text(head, 'th', label).setAttribute('scope', 'col');
+        }
+        const body = text(table, 'tbody', '');
+        for (const [day, counts] of [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+          const row = text(body, 'tr', '');
+          text(row, 'th', day).setAttribute('scope', 'row');
+          for (const number of [counts.access, counts.xdr, counts.other]) text(row, 'td', `${number}건`);
+          const total = text(row, 'td', `${counts.total}건 `);
+          const meter = text(total, 'meter', `${counts.total}건 / 표시 날짜 중 최대 ${maximum}건`);
+          meter.setAttribute('min', '0');
+          meter.setAttribute('max', String(maximum));
+          meter.setAttribute('value', String(counts.total));
+          meter.setAttribute('aria-label', `${day} 받은 기록 ${counts.total}건, 표시 날짜 중 최대 ${maximum}건`);
+        }
+      };
       const count = text(root, 'p', '');
       const list = text(root, 'ul', '');
       const detail = text(root, 'div', '');
@@ -242,6 +336,7 @@ export function createStudentView() {
           && (appFilter.value === 'all' || event.appId === appFilter.value)
           && (accessFilter.value === 'all' || event.state?.access === accessFilter.value));
         count.textContent = `표시 ${shown.length}건 / 받은 기록 ${records.length}건`;
+        drawTrend(shown);
         if (shown.length === 0) text(list, 'li', '선택한 필터에 해당하는 기록이 없습니다.');
         for (const event of shown) {
           const row = text(list, 'li', '');
@@ -274,7 +369,7 @@ export function createStudentView() {
       const modeLine = (parent, current) => {
         switch (current) {
           case 'connected': break;
-          case 'demo': text(parent, 'p', '예제 자료 (demo)'); break;
+          case 'demo': text(parent, 'p', '예시 자료 · 실제 조회 결과 아님 (demo)'); break;
           case 'disconnected': text(parent, 'p', '연결 없음 (disconnected)'); break;
           default: text(parent, 'p', '연결 상태 확인 불가 (unknown)'); break;
         }
@@ -295,6 +390,17 @@ export function createStudentView() {
         text(parent, 'p', retry);
       };
       modeLine(root, mode);
+      const recovery = text(root, 'section', '');
+      text(recovery, 'h3', '자료 연결과 다시 시도');
+      text(recovery, 'p', '이 영역은 기기·세션·기록 알림의 조회 상태입니다. AI 모델 응답 점검과 별개이며, AI 점검 성공만으로 이 자료가 연결되지는 않습니다.');
+      const failures = [['기기 목록', devices], ['현재 세션', sessions]].filter(([, input]) => input?.status === 'error');
+      if (failures.length) {
+        for (const [name, input] of failures) text(recovery, 'p', `${name}: 조회 실패 · 코드: ${safe(input.error?.code)}`);
+        text(recovery, 'p', '다시 시도는 위쪽 「다시 불러오기」 버튼을 직접 누르세요. 자동 재요청하지 않습니다. 연결 없음은 기기·세션 0개나 정상 상태를 뜻하지 않습니다.');
+      } else {
+        text(recovery, 'p', '자료별 현재 상태는 아래에 표시합니다. 최신 값이 필요하면 위쪽 「다시 불러오기」 버튼을 직접 누르세요.');
+      }
+
       const collection = (title, input, empty, renderRow) => {
         const section = text(root, 'section', '');
         text(section, 'h3', title);
