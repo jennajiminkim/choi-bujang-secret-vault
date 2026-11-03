@@ -1,13 +1,41 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
-export function createStudentView() {
+export function createStudentView({ api } = {}) {
+  // 학생 기록 재조회는 한 번에 하나만 실행합니다. 제공 화면의 새 입력은 이전 결과보다 우선합니다.
+  let eventQueryPending = false;
+  let eventMount = null;
+  // 꾸밈은 이 학생 함수가 새로 만든 요소에만 적용합니다. 제공 DOM·전역 CSS는 변경하지 않습니다.
+  const polish = (node, tag) => {
+    const styles = {
+      p: { margin: '0.45rem 0', overflowWrap: 'anywhere' },
+      h3: { margin: '0 0 0.8rem', fontSize: '1.2rem', letterSpacing: '-0.025em' },
+      h4: { margin: '0 0 0.6rem', fontSize: '1.05rem' },
+      section: { minWidth: '0', marginBlock: '0.9rem' },
+      details: { marginBlock: '1rem', padding: '0.9rem', border: '1px solid #dce2ef', borderRadius: '12px', background: 'var(--surface, #ffffff)' },
+      summary: { cursor: 'pointer', fontWeight: '700', padding: '0.25rem', minHeight: '2rem' },
+      button: { minHeight: '44px', padding: '0.6rem 1rem', border: '1px solid #c6cee0', borderRadius: '10px', background: 'var(--surface, #ffffff)', color: 'inherit', font: 'inherit', fontWeight: '600', cursor: 'pointer' },
+      select: { minHeight: '44px', maxWidth: '100%', border: '1px solid #c6cee0', borderRadius: '8px', padding: '0.4rem 0.6rem', background: 'var(--surface, #ffffff)', color: 'inherit' },
+      table: { width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' },
+      caption: { textAlign: 'left', fontWeight: '600', padding: '0.6rem 0' },
+      th: { padding: '0.7rem 0.65rem', textAlign: 'left', borderBottom: '1px solid #dce2ef', background: '#f1f4fa' },
+      td: { padding: '0.7rem 0.65rem', borderBottom: '1px solid #e4e8f1' },
+      meter: { width: '5rem', maxWidth: '100%', height: '0.85rem', verticalAlign: 'middle' },
+    };
+    Object.assign(node.style, styles[tag] || {});
+    return node;
+  };
+  const panelStyle = { padding: '1rem', margin: '0', border: '1px solid #dce2ef', borderRadius: '12px', background: 'var(--surface, #ffffff)', boxShadow: '0 3px 12px rgba(28, 36, 48, 0.035)', minWidth: '0' };
   return {
     renderIdentity({ me, devices, sessions } = {}) {
       // 호출마다 새 요소를 반환합니다. 이전 입력이나 DOM을 보관하지 않습니다.
       const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, value) => {
-        const element = document.createElement(tag);
+        const element = polish(document.createElement(tag), tag);
         element.textContent = value;
+        if (tag === 'h3') element.style.fontSize = '1.2rem';
+        if (tag === 'h4') element.style.fontSize = '1.1rem';
         parent.appendChild(element);
         return element;
       };
@@ -33,7 +61,7 @@ export function createStudentView() {
       const sessionLine = session =>
         `세션 ID: ${value(session?.id)} · 상태: ${sessionState(session?.status)}`;
       const section = (title, input, renderData) => {
-        const container = text(root, 'section', '');
+        const container = text(identityDetails, 'section', '');
         text(container, 'h3', title);
         switch (input?.mode) {
           case 'connected': break;
@@ -51,6 +79,62 @@ export function createStudentView() {
           text(container, 'p', '확인 불가');
         }
       };
+      const overview = text(root, 'section', '');
+      overview.setAttribute('aria-label', 'nævis 상태 요약');
+      text(overview, 'h3', 'nævis 상태 요약');
+      text(overview, 'p', '전달받은 계정·기기·세션 조회 결과입니다. PC 악성코드 검사 결과가 아니며 AI 연결 점검과는 별개입니다.');
+      const cards = text(overview, 'div', '');
+      cards.classList.add('grid-2');
+      Object.assign(cards.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 11rem), 1fr))', gap: '0.8rem', alignItems: 'stretch' });
+      const provenance = input => input?.mode === 'demo'
+        ? '예시 자료 · 실제 조회 결과 아님 (demo)'
+        : input?.mode === 'connected' ? '연동 자료 (connected)'
+        : input?.mode === 'disconnected' ? '연결 없음 (disconnected)' : '자료 출처 확인 불가 (unknown)';
+      const card = (title, input, render) => {
+        const panel = text(cards, 'section', '');
+        panel.classList.add('card');
+        Object.assign(panel.style, panelStyle);
+        text(panel, 'h4', title);
+        const source = text(panel, 'p', provenance(input));
+        Object.assign(source.style, { padding: '0.4rem 0.55rem', border: '1px solid #dce2ef', borderRadius: '7px', background: '#f1f4fa', fontSize: '0.875rem' });
+        if (input?.status === 'loading') text(panel, 'p', '불러오는 중');
+        else if (input?.status === 'error') text(panel, 'p', `조회 실패 · 확인 불가: ${value(input.error?.message)}`);
+        else if (input?.status === 'ok') render(panel, input.data);
+        else text(panel, 'p', '확인 불가 · 현재 조회 결과 없음');
+      };
+      card('사용자', me, (panel, data) => {
+        text(panel, 'p', value(data?.user?.label));
+        text(panel, 'p', `사용자 ID: ${value(data?.user?.id)}`);
+      });
+      card('현재 기기', me, (panel, data) => {
+        text(panel, 'p', deviceLine(data?.device));
+      });
+      card('현재 세션', me, (panel, data) => {
+        text(panel, 'p', sessionLine(data?.session));
+      });
+      // 자료 연결은 세 요약 카드 아래 전체 너비를 사용합니다.
+      const connectionCard = text(overview, 'section', '');
+      connectionCard.classList.add('card');
+      Object.assign(connectionCard.style, { ...panelStyle, marginBlockStart: '0.8rem' });
+      text(connectionCard, 'h4', '계정·기기·세션 자료 연결');
+      const connectionRows = text(connectionCard, 'div', '');
+      Object.assign(connectionRows.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 11rem), 1fr))', gap: '0.8rem' });
+      for (const [name, input] of [['계정', me], ['기기 목록', devices], ['현재 세션 목록', sessions]]) {
+        const state = input?.status === 'loading' ? '불러오는 중'
+          : input?.status === 'error' ? '조회 실패'
+          : input?.status === 'ok' ? '응답 수신' : '확인 불가';
+        const row = text(connectionRows, 'p', `${name}: ${state} · ${provenance(input)}`);
+        Object.assign(row.style, { margin: '0', padding: '0.7rem', border: '1px solid #dce2ef', borderRadius: '8px', background: '#f1f4fa' });
+      }
+      text(connectionCard, 'p', '연결 실패 시 위쪽 「다시 불러오기」 버튼으로 직접 재시도하세요. AI 연결 여부는 AI 연결 점검 영역에서 확인하세요.');
+      const priorities = text(root, 'section', '');
+      Object.assign(priorities.style, { ...panelStyle, marginBlock: '1rem', background: '#f1f4fa' });
+      text(priorities, 'h3', '핵심 기능 안내');
+      text(priorities, 'p', '① 내 PC 상태: 제공 「내 PC 확인」에서 실측값·단위·시각 확인');
+      text(priorities, 'p', '② 보안 기록: 보안 기록 메뉴에서 학생 날짜별 추이·목록·기록 다시 조회');
+      text(priorities, 'p', '③ 자료 연결 확인: 학생 상태·알림 영역에서 SDP 진단·실패 항목·다음 행동 확인');
+      const identityDetails = text(root, 'details', '');
+      text(identityDetails, 'summary', '계정·기기·세션 상세 펼치기');
       section('현재 계정·기기·세션', me, (container, data) => {
         text(container, 'p', `사용자 이름: ${value(data?.user?.label)}`);
         text(container, 'p', `사용자 ID: ${value(data?.user?.id)}`);
@@ -123,11 +207,13 @@ export function createStudentView() {
       }
       return root;
     },
-    renderEvents({ status, mode, data, error } = {}) {
+    renderEvents(input = {}) {
+      const renderRecords = ({ status, mode, data, error } = {}) => {
       // 입력마다 새 DOM과 선택 상태를 만듭니다. 원본 목록은 변경하지 않습니다.
       const root = document.createElement('div');
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
-        const node = document.createElement(tag);
+        const node = polish(document.createElement(tag), tag);
         node.textContent = content;
         parent.appendChild(node);
         return node;
@@ -140,16 +226,21 @@ export function createStudentView() {
         : kind === 'xdr' ? 'XDR 경보 (xdr)' : '확인 불가 (unknown)';
       switch (mode) {
         case 'connected': break;
-        case 'demo': text(root, 'p', '예제 자료 (demo)'); break;
+        case 'demo': text(root, 'p', '예시 자료 · 실제 조회 결과 아님 (demo)'); break;
         case 'disconnected': text(root, 'p', '연결 없음 (disconnected)'); break;
         default: text(root, 'p', '연결 상태 확인 불가 (unknown)'); break;
       }
       if (status === 'loading') {
-        text(root, 'p', '기록을 불러오는 중');
+        text(root, 'p', '기록을 불러오는 중 · 추이 집계 대기');
         return root;
       }
       if (status === 'error') {
-        text(root, 'p', `기록을 불러오지 못했습니다: ${value(error?.message)}`);
+        root.setAttribute('role', 'alert');
+        Object.assign(root.style, { ...panelStyle, borderInlineStart: '4px solid #b42318' });
+        text(root, 'h3', '보안 기록 조회 실패');
+        text(root, 'p', `실패한 항목: 보안 기록 · 코드: ${value(error?.code)}`);
+        text(root, 'p', `이유: ${value(error?.message)}`);
+        text(root, 'p', '기록 추이: 조회 불가. 조회 실패는 기록 0건을 뜻하지 않습니다. 로컬 서버 실행 상태를 확인한 뒤 「기록 다시 조회」를 누르세요. 제공 화면 전체는 위쪽 「다시 불러오기」로 갱신합니다.');
         if (error?.code === 'CONTRACT_MISMATCH') {
           text(root, 'p', '확인 불가: 기록 응답 형식이 입력 계약과 일치하지 않습니다.');
         }
@@ -161,6 +252,7 @@ export function createStudentView() {
       }
       if (data.length === 0) {
         text(root, 'p', '표시할 기록이 없습니다');
+        text(root, 'p', '받은 기록 0건 · 추이를 계산할 자료가 없습니다. 전체 이력이 없다는 뜻은 아닙니다.');
         return root;
       }
       const records = [...data].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -178,10 +270,18 @@ export function createStudentView() {
       const deviceLabel = state => state === 'compliant' ? '보안 기준 충족 (compliant)'
         : state === 'noncompliant' ? '보안 기준 미충족 (noncompliant)' : '확인 불가(unknown)';
       const filters = text(root, 'div', '');
+      filters.style.display = 'flex';
+      filters.style.flexWrap = 'wrap';
+      filters.style.gap = '0.75rem';
+      filters.style.marginBlock = '1rem';
+      Object.assign(filters.style, { padding: '0.85rem', borderRadius: '12px', background: '#f1f4fa', alignItems: 'end' });
       const makeFilter = (name, values, labelFor) => {
         const label = text(filters, 'label', name);
-        const select = document.createElement('select');
+        const select = polish(document.createElement('select'), 'select');
+        Object.assign(label.style, { display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '0', flex: '1 1 9rem', fontWeight: '600' });
         select.setAttribute('aria-label', name);
+        select.style.fontSize = '1rem';
+        select.style.marginInlineStart = '0';
         // label로 감싼 네이티브 선택 상자는 키보드로 조작할 수 있습니다.
         label.appendChild(select);
         const add = (raw, caption) => {
@@ -198,13 +298,68 @@ export function createStudentView() {
       const kindFilter = makeFilter('기록 종류', records.map(event => event.kind), kindLabel);
       const appFilter = makeFilter('업무 앱', records.map(event => event.appId), appLabel);
       const accessFilter = makeFilter('접속 상태', records.map(event => event.state?.access), accessLabel);
+      const trend = text(root, 'section', '');
+      trend.setAttribute('aria-label', '받은 기록의 날짜별 추이');
+      text(trend, 'h3', '받은 기록의 날짜별 추이');
+      text(trend, 'p', '현재 필터에 해당하는 받은 기록만 한국 시각(Asia/Seoul) 날짜로 집계합니다. 최근 최대 40건의 일부 이력이며, 기록이 없는 날짜를 0건으로 채우지 않습니다.');
+      const trendBody = text(trend, 'div', '');
+      trendBody.style.overflowX = 'auto';
+      const dateKey = at => {
+        if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null;
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(new Date(at));
+        const get = type => parts.find(part => part.type === type)?.value;
+        return `${get('year')}-${get('month')}-${get('day')}`;
+      };
+      const drawTrend = shown => {
+        trendBody.replaceChildren();
+        const days = new Map();
+        let missing = 0;
+        for (const event of shown) {
+          const day = dateKey(event.at);
+          if (!day) { missing++; continue; }
+          const counts = days.get(day) || { access: 0, xdr: 0, other: 0, total: 0 };
+          counts.total++;
+          if (event.kind === 'access') counts.access++;
+          else if (event.kind === 'xdr') counts.xdr++;
+          else counts.other++;
+          days.set(day, counts);
+        }
+        if (missing) text(trendBody, 'p', `시각 확인 불가 ${missing}건은 날짜별 집계에서 제외했습니다. 목록에는 유지합니다.`);
+        if (days.size === 0) {
+          text(trendBody, 'p', '현재 필터에서 날짜별 추이를 계산할 기록이 없습니다.');
+          return;
+        }
+        const maximum = Math.max(...Array.from(days.values(), day => day.total));
+        const table = text(trendBody, 'table', '');
+        text(table, 'caption', '날짜별 받은 기록 건수 · 필터 적용 결과');
+        const head = text(text(table, 'thead', ''), 'tr', '');
+        for (const label of ['한국 시각 날짜', '접속 기록', 'XDR 경보', '기타·확인 불가', '합계·상대 크기']) {
+          text(head, 'th', label).setAttribute('scope', 'col');
+        }
+        const body = text(table, 'tbody', '');
+        for (const [day, counts] of [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+          const row = text(body, 'tr', '');
+          text(row, 'th', day).setAttribute('scope', 'row');
+          for (const number of [counts.access, counts.xdr, counts.other]) text(row, 'td', `${number}건`);
+          const total = text(row, 'td', `${counts.total}건 `);
+          const meter = text(total, 'meter', `${counts.total}건 / 표시 날짜 중 최대 ${maximum}건`);
+          meter.setAttribute('min', '0');
+          meter.setAttribute('max', String(maximum));
+          meter.setAttribute('value', String(counts.total));
+          meter.setAttribute('aria-label', `${day} 받은 기록 ${counts.total}건, 표시 날짜 중 최대 ${maximum}건`);
+        }
+      };
       const count = text(root, 'p', '');
       const list = text(root, 'ul', '');
+      Object.assign(list.style, { listStyle: 'none', padding: '0', display: 'grid', gap: '0.8rem' });
       const detail = text(root, 'div', '');
       const showDetail = event => {
         detail.replaceChildren();
         const panel = text(detail, 'section', '');
         panel.setAttribute('data-student-event-detail', event.id);
+        Object.assign(panel.style, { ...panelStyle, marginBlock: '1rem' });
         text(panel, 'h3', `${value(event.id)} 상세`);
         text(panel, 'p', `사건 ID: ${value(event.id)} · 업무 앱: ${appLabel(event.appId)}`);
         const entries = (heading, rows) => {
@@ -242,10 +397,12 @@ export function createStudentView() {
           && (appFilter.value === 'all' || event.appId === appFilter.value)
           && (accessFilter.value === 'all' || event.state?.access === accessFilter.value));
         count.textContent = `표시 ${shown.length}건 / 받은 기록 ${records.length}건`;
+        drawTrend(shown);
         if (shown.length === 0) text(list, 'li', '선택한 필터에 해당하는 기록이 없습니다.');
         for (const event of shown) {
           const row = text(list, 'li', '');
           row.setAttribute('data-student-event-id', event.id);
+          Object.assign(row.style, panelStyle);
           text(row, 'p', `사건 ID: ${value(event.id)} · 시각: ${value(event.at)}`);
           text(row, 'p', `종류: ${kindLabel(event.kind)} · 업무 앱: ${appLabel(event.appId)}`);
           text(row, 'p', `요약: ${value(event.summary)}`);
@@ -257,13 +414,133 @@ export function createStudentView() {
       for (const select of [kindFilter, appFilter, accessFilter]) select.addEventListener('change', draw);
       draw();
       return root;
+      };
+      const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
+      const text = (parent, tag, content) => {
+        const node = polish(document.createElement(tag), tag);
+        node.textContent = content;
+        parent.appendChild(node);
+        return node;
+      };
+      text(root, 'h3', '기록 추이와 목록').style.fontSize = '1.2rem';
+      text(root, 'p', '학생 작성 추이·필터·상세입니다. 재조회는 이 학생 기록 영역만 갱신하며 제공 화면·PC 실측·SDP 도움정보는 갱신하지 않습니다.');
+      const button = text(root, 'button', '기록 다시 조회');
+      button.type = 'button';
+      button.style.fontSize = '1rem';
+      button.style.padding = '0.6rem 1rem';
+      Object.assign(button.style, { background: 'var(--accent, #4f46a5)', color: '#ffffff', borderColor: 'var(--accent, #4f46a5)' });
+      const notice = text(root, 'p', '');
+      Object.assign(notice.style, { padding: '0.75rem', marginBlock: '0.8rem', borderRadius: '10px', background: '#f1f4fa', border: '1px solid #dce2ef' });
+      notice.setAttribute('role', 'status');
+      notice.setAttribute('aria-live', 'polite');
+      const resultTime = text(root, 'p', '응답 시각: 확인 불가 · 최초 제공 입력에는 시각이 전달되지 않습니다.');
+      resultTime.style.fontVariantNumeric = 'tabular-nums';
+      const content = text(root, 'div', '');
+      const available = typeof api?.get === 'function';
+      const mount = {
+        reset() {
+          button.setAttribute('aria-disabled', String(!available));
+          root.setAttribute('aria-busy', 'false');
+          notice.textContent = available ? '자동 조회하지 않습니다. 버튼을 누르면 받은 기록을 새로 조회하고 필터·상세를 초기화합니다.'
+            : '학생 재조회 API를 사용할 수 없습니다. 위쪽 제공 「다시 불러오기」를 사용하세요.';
+        },
+      };
+      eventMount = mount;
+      content.appendChild(renderRecords(input));
+      mount.reset();
+      if (eventQueryPending) {
+        button.setAttribute('aria-disabled', 'true');
+        notice.textContent = '이전 학생 기록 요청 정리 중… 현재 제공 입력을 우선 표시합니다.';
+      }
+      // 네이티브 버튼을 DOM에 유지하고 aria-disabled와 실행 가드로 중복 요청을 막습니다.
+      // Tab으로 다른 곳에 이동한 사용자의 초점을 완료 시 강제로 옮기지 않습니다.
+      const safe = value => typeof value === 'string' && value.length > 0 && value.length <= 2000
+        && !/(?:Bearer\s+\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:password|access_token|api[_ -]?key)\s*[:=])/i.test(value) ? value : '확인 불가';
+      const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+      const isId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value);
+      const isText = value => typeof value === 'string' && value.length <= 2000;
+      const textRow = row => isRecord(row) && isId(row.id) && isText(row.text);
+      const validEvents = rows => Array.isArray(rows) && rows.length <= 40
+        && rows.every(row => isRecord(row) && isId(row.id)
+          && ['access', 'xdr'].includes(row.kind) && typeof row.at === 'string' && Number.isFinite(Date.parse(row.at))
+          && isText(row.summary) && (row.appId == null || isId(row.appId))
+          && Array.isArray(row.evidence) && row.evidence.every(textRow)
+          && Array.isArray(row.rules) && row.rules.every(textRow)
+          && isRecord(row.state) && ['allowed', 'denied', 'unknown'].includes(row.state.access)
+          && ['active', 'expired', 'revoked', 'unknown'].includes(row.state.session)
+          && ['compliant', 'noncompliant', 'unknown'].includes(row.state.device)
+          && Array.isArray(row.supportedActions) && row.supportedActions.every(isId))
+        && new Set(rows.map(row => row.id)).size === rows.length;
+      const validCoverage = (coverage, rows, requestedAt, receivedAt) => {
+        const fields = ['schema', 'kind', 'scope', 'limit', 'total', 'returned', 'truncated', 'observedAtMs'];
+        return isRecord(coverage) && Object.keys(coverage).length === fields.length
+          && fields.every(field => Object.hasOwn(coverage, field))
+          && coverage.schema === 'alekov.sdp.coverage.v1' && coverage.kind === 'events'
+          && coverage.scope === 'own-recorded-events' && coverage.limit === 40
+          && Number.isSafeInteger(coverage.total) && Number.isSafeInteger(coverage.returned)
+          && coverage.returned === rows.length && coverage.total >= coverage.returned
+          && typeof coverage.truncated === 'boolean' && coverage.truncated === (coverage.total > coverage.returned)
+          && Number.isSafeInteger(coverage.observedAtMs) && coverage.observedAtMs > 0
+          && coverage.observedAtMs >= requestedAt - 5000 && coverage.observedAtMs <= receivedAt + 5000
+          && receivedAt - coverage.observedAtMs <= 20000;
+      };
+      button.addEventListener('click', async () => {
+        if (!available || eventQueryPending || eventMount !== mount) return;
+        eventQueryPending = true;
+        button.setAttribute('aria-disabled', 'true');
+        root.setAttribute('aria-busy', 'true');
+        notice.textContent = '기록 조회 중… 잠시 기다려 주세요.';
+        resultTime.textContent = '이번 응답 시각: 확인 불가 · 조회 중';
+        content.replaceChildren(renderRecords({ status: 'loading', mode: 'unknown' }));
+        let outcome;
+        const requestedAt = Date.now();
+        try {
+          const response = await api.get('/api/events');
+          const receivedAt = Date.now();
+          if (eventMount !== mount) return;
+          const mode = ['connected', 'demo', 'disconnected'].includes(response?.meta?.mode) ? response.meta.mode : 'unknown';
+          if (response?.ok === false) {
+            outcome = { status: 'error', mode, error: { code: safe(response.error?.code), message: safe(response.error?.message) } };
+          } else if (response?.ok !== true || !validEvents(response.data) || mode === 'unknown'
+            || (Object.hasOwn(response, 'coverage') && !validCoverage(response.coverage, response.data, requestedAt, receivedAt))) {
+            outcome = { status: 'error', mode: 'unknown', error: { code: 'CONTRACT_MISMATCH', message: '기록 응답 형식 또는 조회 범위를 확인할 수 없습니다.' } };
+          } else {
+            outcome = { status: 'ok', mode, data: response.data };
+          }
+          const at = response?.meta?.checkedAt;
+          const validTime = typeof at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(at) && Number.isFinite(Date.parse(at));
+          resultTime.textContent = validTime ? `이번 응답 시각(checkedAt): ${at} · 기록 발생 시각이나 PC 측정 시각이 아닙니다.`
+            : '이번 응답 시각: 확인 불가 · 유효한 시각이 전달되지 않았습니다.';
+        } catch {
+          if (eventMount !== mount) return;
+          outcome = { status: 'error', mode: 'unknown', error: { code: 'STUDENT_QUERY_FAILED', message: '학생 기록 요청을 완료하지 못했습니다. 로컬 서버 실행 상태를 확인하세요.' } };
+          resultTime.textContent = '이번 응답 시각: 확인 불가 · 요청을 완료하지 못했습니다.';
+        } finally {
+          eventQueryPending = false;
+          if (eventMount === mount) {
+            mount.reset();
+            content.replaceChildren(renderRecords(outcome));
+            notice.textContent = outcome?.status === 'ok' ? '기록 응답을 받아 학생 추이·목록을 갱신했습니다. 실제 시스템 연결 여부는 자료 출처 표시와 구분하세요.'
+              : '보안 기록 조회 실패 · 아래 실패 항목과 다음 행동을 확인하세요.';
+          } else {
+            eventMount?.reset();
+          }
+        }
+      });
+      return root;
     },
     renderStatus({ devices, sessions, notifications, diagnostics, mode } = {}) {
       // 매 입력마다 새 화면을 만들며 이전 목록·오류·도움정보는 보관하지 않습니다.
       const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
-        const node = document.createElement(tag);
+        const node = polish(document.createElement(tag), tag);
+        if (tag === 'section') Object.assign(node.style, { ...panelStyle, marginBlock: '1rem' });
         node.textContent = content;
+        if (tag === 'h3') node.style.fontSize = '1.2rem';
         parent.appendChild(node);
         return node;
       };
@@ -274,7 +551,7 @@ export function createStudentView() {
       const modeLine = (parent, current) => {
         switch (current) {
           case 'connected': break;
-          case 'demo': text(parent, 'p', '예제 자료 (demo)'); break;
+          case 'demo': text(parent, 'p', '예시 자료 · 실제 조회 결과 아님 (demo)'); break;
           case 'disconnected': text(parent, 'p', '연결 없음 (disconnected)'); break;
           default: text(parent, 'p', '연결 상태 확인 불가 (unknown)'); break;
         }
@@ -295,6 +572,97 @@ export function createStudentView() {
         text(parent, 'p', retry);
       };
       modeLine(root, mode);
+      // 학습용 설명만 표시합니다. PC 값은 이 함수의 입력에 없으므로 수치·시각을 생성하지 않습니다.
+      const pcGuide = text(root, 'details', '');
+      text(pcGuide, 'summary', 'PC 수치 읽는 법');
+      text(pcGuide, 'p', '학생 작성 설명 · 실측 결과나 AI 분석이 아닙니다. 실제 값은 제공 영역 「내 PC 상태」의 「내 PC 확인」으로 조회하세요. 이 설명은 값을 수집하거나 자동 요청하지 않습니다.');
+      const guideTable = text(pcGuide, 'table', '');
+      text(guideTable, 'caption', '제공 PC 조회 값의 의미·단위·시각');
+      const guideHead = text(text(guideTable, 'thead', ''), 'tr', '');
+      for (const heading of ['항목', '뜻과 단위', '측정·비교할 때']) text(guideHead, 'th', heading).setAttribute('scope', 'col');
+      const guideBody = text(guideTable, 'tbody', '');
+      for (const [name, meaning, comparison] of [
+        ['CPU 사용률', '약 200ms 구간의 전체 CPU 시간 대비 사용 비율(%)입니다.', '작업 관리자와 가까운 시각에 비교하세요. 표본 구간·갱신 주기가 달라 수치가 정확히 같을 필요는 없습니다.'],
+        ['메모리 사용량', '사용량 / 전체 용량입니다. 제공 화면은 GB로 표시하지만 계산 기준은 1,073,741,824바이트(1GiB)입니다.', '캐시·예약 메모리 등 집계 방식에 따라 작업 관리자와 차이가 날 수 있습니다. 같은 범위·단위인지 먼저 확인하세요.'],
+        ['디스크 남은 공간', '현재 앱 폴더가 있는 디스크의 여유 공간 / 전체 용량입니다. 제공 화면의 GB는 1024³바이트 기준입니다.', '파일 탐색기의 같은 드라이브와 비교하세요. 메모리와 달리 앞 숫자는 사용량이 아니라 여유 공간입니다.']
+      ]) {
+        const row = text(guideBody, 'tr', '');
+        text(row, 'th', name).setAttribute('scope', 'row');
+        text(row, 'td', meaning);
+        text(row, 'td', comparison);
+      }
+      text(pcGuide, 'h4', '시각과 확인 불가 읽기');
+      text(pcGuide, 'p', '제공 카드 위 「이 PC 마지막 실측」은 응답을 만든 시각(measuredAt)입니다. 세 항목이 정확히 같은 순간에 측정됐다는 뜻은 아니며 항목별 시각은 별도로 제공되지 않습니다. 이 학생 설명에는 현재 PC 값과 측정 시각이 전달되지 않습니다.');
+      text(pcGuide, 'p', '읽지 못한 값은 확인 불가와 표시된 이유(읽기 권한 없음·시간 초과·미지원·조회 실패)를 확인하세요. 0이나 정상으로 바꾸지 말고 예시 값으로 채우지 않습니다. 관리자 권한 실행이나 권한 변경은 이 절차에서 요청하지 않습니다.');
+      text(pcGuide, 'h4', '실측과 예시 자료 구분');
+      text(pcGuide, 'p', '내 PC 상태는 제공된 로컬 실측 기능입니다. demo 계정·기기·세션·event-01 기록은 예시 자료이며 실제 PC 측정 결과가 아닙니다. PC 실측 성공은 SDP 연결·AI 설명 성공이나 PC 안전을 보장하지 않습니다.');
+      // SDP 진단은 제공된 수동 조회 결과만 사용합니다. PC 값·AI 상태에서 연결을 추측하지 않습니다.
+      const sdp = text(root, 'section', '');
+      text(sdp, 'h3', 'SDP 연결 상태');
+      text(sdp, 'p', '제공 도움정보의 진단 응답 기준입니다. 내 PC 실측·AI 모델 응답 점검과 별개이며 실시간 연결 감시가 아닙니다.');
+      const diagnosticData = diagnostics?.status === 'ok' && diagnostics.data
+        && typeof diagnostics.data === 'object' && !Array.isArray(diagnostics.data) ? diagnostics.data : null;
+      const engineMode = diagnosticData?.engine?.mode;
+      const engineCode = diagnosticData?.engine?.code;
+      if (diagnostics?.status === 'loading') {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단 정보 불러오는 중');
+      } else if (diagnostics?.status === 'error') {
+        text(sdp, 'p', `SDP 연결 상태 확인 불가 · 진단 조회 실패 · 코드: ${safe(diagnostics.error?.code)} · 이유: ${safe(diagnostics.error?.message)}`);
+      } else if (!diagnosticData) {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 사용할 수 있는 진단 응답이 없습니다.');
+      } else if (diagnostics.mode !== engineMode) {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단의 자료 모드와 엔진 모드가 일치하지 않습니다.');
+      } else if (engineMode === 'demo' && engineCode === 'DEMO_ONLY') {
+        text(sdp, 'p', 'SDP 미연결 · 예제 모드로 실행 중 (demo / DEMO_ONLY)');
+        text(sdp, 'p', '예제 계정·기기·세션·기록은 실제 조회 결과가 아닙니다. 제공 「내 PC 상태」에서 읽은 값과 구분하세요.');
+      } else if (engineMode === 'disconnected' && engineCode === 'ENGINE_NOT_CONNECTED') {
+        text(sdp, 'p', 'SDP 미연결 · 연결 어댑터 미연결 상태 (disconnected / ENGINE_NOT_CONNECTED)');
+      } else if (engineMode === 'connected' && engineCode === 'ADAPTER_CONFIGURED') {
+        text(sdp, 'p', 'SDP 연결 설정 있음 · 실제 통신 성공 여부는 이 진단으로 확인 불가 (connected / ADAPTER_CONFIGURED)');
+      } else {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단 모드·코드가 지원하는 조합이 아니거나 누락되었습니다.');
+      }
+      const diagnosticTime = diagnosticData?.checkedAt;
+      const validDiagnosticTime = typeof diagnosticTime === 'string'
+        && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(diagnosticTime)
+        && Number.isFinite(Date.parse(diagnosticTime));
+      text(sdp, 'p', validDiagnosticTime ? `진단 응답 시각(checkedAt): ${diagnosticTime}`
+        : '진단 응답 시각: 확인 불가 · 유효한 시각이 전달되지 않았습니다.');
+      text(sdp, 'p', '최신 진단은 제공 화면의 「도움정보 불러오기」 버튼을 직접 누르세요. 자동 재요청하지 않습니다. 진단 이후 상태가 바뀔 수 있습니다.');
+      const connectionGuide = text(root, 'details', '');
+      text(connectionGuide, 'summary', '네트워크·방화벽·Windows 기록 읽는 법');
+      text(connectionGuide, 'p', '학생 작성 설명입니다. 현재 실측값은 제공 「내 PC 상태」에서 확인하세요. 이 영역은 값을 수집하거나 설정을 바꾸지 않습니다.');
+      const connectionTable = text(connectionGuide, 'table', '');
+      text(connectionTable, 'caption', '제공 조회의 범위와 해석 한계');
+      const connectionHead = text(text(connectionTable, 'thead', ''), 'tr', '');
+      for (const heading of ['항목', '제공 조회·단위', '해석과 제한']) text(connectionHead, 'th', heading).setAttribute('scope', 'col');
+      const connectionBody = text(connectionTable, 'tbody', '');
+      for (const [name, scope, limit] of [
+        ['네트워크 구성', '네트워크 인터페이스 개수·IPv4 구성 개수(개)', '구성 개수만 읽습니다. 유선·무선 연결, 인터넷 통신 또는 SDP·ZTNA 접근 성공을 확인한 결과가 아닙니다.'],
+        ['Windows 방화벽', 'Domain·Private·Public 프로필의 켜짐·꺼짐', '설정을 읽기만 합니다. 켜짐은 PC 전체의 안전 판정이 아니며 앱은 방화벽 설정을 변경하지 않습니다.'],
+        ['Windows 기록', '최근 24시간 System·Application의 경고·오류 건수(건), 최신 최대 5,000건', '침해·공격 탐지 결과가 아닙니다. 상한을 넘으면 일부 집계이며 Security 로그나 모든 Windows 로그를 조회한 결과가 아닙니다.']
+      ]) {
+        const row = text(connectionBody, 'tr', '');
+        text(row, 'th', name).setAttribute('scope', 'row');
+        text(row, 'td', scope);
+        text(row, 'td', limit);
+      }
+      text(connectionGuide, 'p', '시각은 제공 카드 위 「이 PC 마지막 실측」의 공통 measuredAt을 확인하세요. 이 학생 영역에는 PC 값·측정 시각이 전달되지 않습니다. SDP 진단 시각과 PC 실측 시각은 서로 다른 응답의 시각입니다.');
+      text(connectionGuide, 'p', '읽기 권한 없음·시간 초과·미지원·조회 실패는 확인 불가와 이유로 남깁니다. 0건·꺼짐·정상이나 예시 값으로 대체하지 않습니다. 관리자 권한 실행·권한 변경·공격 또는 침투 모의시험은 요청하지 않습니다.');
+      const recovery = text(root, 'section', '');
+      text(recovery, 'h3', '자료 연결과 다시 시도');
+      text(recovery, 'p', '이 영역은 기기·세션·기록 알림의 조회 상태입니다. AI 모델 응답 점검과 별개이며, AI 점검 성공만으로 이 자료가 연결되지는 않습니다.');
+      const failures = [['기기 목록', devices], ['현재 세션', sessions]].filter(([, input]) => input?.status === 'error');
+      if (failures.length) {
+        for (const [name, input] of failures) text(recovery, 'p', `${name}: 조회 실패 · 코드: ${safe(input.error?.code)}`);
+        text(recovery, 'p', '다시 시도는 위쪽 「다시 불러오기」 버튼을 직접 누르세요. 자동 재요청하지 않습니다. 연결 없음은 기기·세션 0개나 정상 상태를 뜻하지 않습니다.');
+      } else {
+        text(recovery, 'p', '자료별 현재 상태는 아래에 표시합니다. 최신 값이 필요하면 위쪽 「다시 불러오기」 버튼을 직접 누르세요.');
+      }
+
+      // 연결 상태와 실패·다음 행동을 설명 패널보다 먼저 표시합니다.
+      root.insertBefore(sdp, pcGuide);
+      root.insertBefore(recovery, pcGuide);
       const collection = (title, input, empty, renderRow) => {
         const section = text(root, 'section', '');
         text(section, 'h3', title);
