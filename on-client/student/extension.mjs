@@ -414,6 +414,59 @@ export function createStudentView() {
       text(pcGuide, 'p', '읽지 못한 값은 확인 불가와 표시된 이유(읽기 권한 없음·시간 초과·미지원·조회 실패)를 확인하세요. 0이나 정상으로 바꾸지 말고 예시 값으로 채우지 않습니다. 관리자 권한 실행이나 권한 변경은 이 절차에서 요청하지 않습니다.');
       text(pcGuide, 'h4', '실측과 예시 자료 구분');
       text(pcGuide, 'p', '내 PC 상태는 제공된 로컬 실측 기능입니다. demo 계정·기기·세션·event-01 기록은 예시 자료이며 실제 PC 측정 결과가 아닙니다. PC 실측 성공은 SDP 연결·AI 설명 성공이나 PC 안전을 보장하지 않습니다.');
+      // SDP 진단은 제공된 수동 조회 결과만 사용합니다. PC 값·AI 상태에서 연결을 추측하지 않습니다.
+      const sdp = text(root, 'section', '');
+      text(sdp, 'h3', 'SDP 연결 상태');
+      text(sdp, 'p', '제공 도움정보의 진단 응답 기준입니다. 내 PC 실측·AI 모델 응답 점검과 별개이며 실시간 연결 감시가 아닙니다.');
+      const diagnosticData = diagnostics?.status === 'ok' && diagnostics.data
+        && typeof diagnostics.data === 'object' && !Array.isArray(diagnostics.data) ? diagnostics.data : null;
+      const engineMode = diagnosticData?.engine?.mode;
+      const engineCode = diagnosticData?.engine?.code;
+      if (diagnostics?.status === 'loading') {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단 정보 불러오는 중');
+      } else if (diagnostics?.status === 'error') {
+        text(sdp, 'p', `SDP 연결 상태 확인 불가 · 진단 조회 실패 · 코드: ${safe(diagnostics.error?.code)} · 이유: ${safe(diagnostics.error?.message)}`);
+      } else if (!diagnosticData) {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 사용할 수 있는 진단 응답이 없습니다.');
+      } else if (diagnostics.mode !== engineMode) {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단의 자료 모드와 엔진 모드가 일치하지 않습니다.');
+      } else if (engineMode === 'demo' && engineCode === 'DEMO_ONLY') {
+        text(sdp, 'p', 'SDP 미연결 · 예제 모드로 실행 중 (demo / DEMO_ONLY)');
+        text(sdp, 'p', '예제 계정·기기·세션·기록은 실제 조회 결과가 아닙니다. 제공 「내 PC 상태」에서 읽은 값과 구분하세요.');
+      } else if (engineMode === 'disconnected' && engineCode === 'ENGINE_NOT_CONNECTED') {
+        text(sdp, 'p', 'SDP 미연결 · 연결 어댑터 미연결 상태 (disconnected / ENGINE_NOT_CONNECTED)');
+      } else if (engineMode === 'connected' && engineCode === 'ADAPTER_CONFIGURED') {
+        text(sdp, 'p', 'SDP 연결 설정 있음 · 실제 통신 성공 여부는 이 진단으로 확인 불가 (connected / ADAPTER_CONFIGURED)');
+      } else {
+        text(sdp, 'p', 'SDP 연결 상태 확인 불가 · 진단 모드·코드가 지원하는 조합이 아니거나 누락되었습니다.');
+      }
+      const diagnosticTime = diagnosticData?.checkedAt;
+      const validDiagnosticTime = typeof diagnosticTime === 'string'
+        && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(diagnosticTime)
+        && Number.isFinite(Date.parse(diagnosticTime));
+      text(sdp, 'p', validDiagnosticTime ? `진단 응답 시각(checkedAt): ${diagnosticTime}`
+        : '진단 응답 시각: 확인 불가 · 유효한 시각이 전달되지 않았습니다.');
+      text(sdp, 'p', '최신 진단은 제공 화면의 「도움정보 불러오기」 버튼을 직접 누르세요. 자동 재요청하지 않습니다. 진단 이후 상태가 바뀔 수 있습니다.');
+      const connectionGuide = text(root, 'details', '');
+      text(connectionGuide, 'summary', '네트워크·방화벽·Windows 기록 읽는 법');
+      text(connectionGuide, 'p', '학생 작성 설명입니다. 현재 실측값은 제공 「내 PC 상태」에서 확인하세요. 이 영역은 값을 수집하거나 설정을 바꾸지 않습니다.');
+      const connectionTable = text(connectionGuide, 'table', '');
+      text(connectionTable, 'caption', '제공 조회의 범위와 해석 한계');
+      const connectionHead = text(text(connectionTable, 'thead', ''), 'tr', '');
+      for (const heading of ['항목', '제공 조회·단위', '해석과 제한']) text(connectionHead, 'th', heading).setAttribute('scope', 'col');
+      const connectionBody = text(connectionTable, 'tbody', '');
+      for (const [name, scope, limit] of [
+        ['네트워크 구성', '네트워크 인터페이스 개수·IPv4 구성 개수(개)', '구성 개수만 읽습니다. 유선·무선 연결, 인터넷 통신 또는 SDP·ZTNA 접근 성공을 확인한 결과가 아닙니다.'],
+        ['Windows 방화벽', 'Domain·Private·Public 프로필의 켜짐·꺼짐', '설정을 읽기만 합니다. 켜짐은 PC 전체의 안전 판정이 아니며 앱은 방화벽 설정을 변경하지 않습니다.'],
+        ['Windows 기록', '최근 24시간 System·Application의 경고·오류 건수(건), 최신 최대 5,000건', '침해·공격 탐지 결과가 아닙니다. 상한을 넘으면 일부 집계이며 Security 로그나 모든 Windows 로그를 조회한 결과가 아닙니다.']
+      ]) {
+        const row = text(connectionBody, 'tr', '');
+        text(row, 'th', name).setAttribute('scope', 'row');
+        text(row, 'td', scope);
+        text(row, 'td', limit);
+      }
+      text(connectionGuide, 'p', '시각은 제공 카드 위 「이 PC 마지막 실측」의 공통 measuredAt을 확인하세요. 이 학생 영역에는 PC 값·측정 시각이 전달되지 않습니다. SDP 진단 시각과 PC 실측 시각은 서로 다른 응답의 시각입니다.');
+      text(connectionGuide, 'p', '읽기 권한 없음·시간 초과·미지원·조회 실패는 확인 불가와 이유로 남깁니다. 0건·꺼짐·정상이나 예시 값으로 대체하지 않습니다. 관리자 권한 실행·권한 변경·공격 또는 침투 모의시험은 요청하지 않습니다.');
       const recovery = text(root, 'section', '');
       text(recovery, 'h3', '자료 연결과 다시 시도');
       text(recovery, 'p', '이 영역은 기기·세션·기록 알림의 조회 상태입니다. AI 모델 응답 점검과 별개이며, AI 점검 성공만으로 이 자료가 연결되지는 않습니다.');
