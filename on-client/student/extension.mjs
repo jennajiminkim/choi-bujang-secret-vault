@@ -4,6 +4,27 @@ export function createStudentView({ api } = {}) {
   // 학생 기록 재조회는 한 번에 하나만 실행합니다. 제공 화면의 새 입력은 이전 결과보다 우선합니다.
   let eventQueryPending = false;
   let eventMount = null;
+  // 꾸밈은 이 학생 함수가 새로 만든 요소에만 적용합니다. 제공 DOM·전역 CSS는 변경하지 않습니다.
+  const polish = (node, tag) => {
+    const styles = {
+      p: { margin: '0.45rem 0', overflowWrap: 'anywhere' },
+      h3: { margin: '0 0 0.8rem', fontSize: '1.2rem', letterSpacing: '-0.025em' },
+      h4: { margin: '0 0 0.6rem', fontSize: '1.05rem' },
+      section: { minWidth: '0', marginBlock: '0.9rem' },
+      details: { marginBlock: '1rem', padding: '0.9rem', border: '1px solid #dce2ef', borderRadius: '12px', background: 'var(--surface, #ffffff)' },
+      summary: { cursor: 'pointer', fontWeight: '700', padding: '0.25rem', minHeight: '2rem' },
+      button: { minHeight: '44px', padding: '0.6rem 1rem', border: '1px solid #c6cee0', borderRadius: '10px', background: 'var(--surface, #ffffff)', color: 'inherit', font: 'inherit', fontWeight: '600', cursor: 'pointer' },
+      select: { minHeight: '44px', maxWidth: '100%', border: '1px solid #c6cee0', borderRadius: '8px', padding: '0.4rem 0.6rem', background: 'var(--surface, #ffffff)', color: 'inherit' },
+      table: { width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' },
+      caption: { textAlign: 'left', fontWeight: '600', padding: '0.6rem 0' },
+      th: { padding: '0.7rem 0.65rem', textAlign: 'left', borderBottom: '1px solid #dce2ef', background: '#f1f4fa' },
+      td: { padding: '0.7rem 0.65rem', borderBottom: '1px solid #e4e8f1' },
+      meter: { width: '5rem', maxWidth: '100%', height: '0.85rem', verticalAlign: 'middle' },
+    };
+    Object.assign(node.style, styles[tag] || {});
+    return node;
+  };
+  const panelStyle = { padding: '1rem', margin: '0', border: '1px solid #dce2ef', borderRadius: '12px', background: 'var(--surface, #ffffff)', boxShadow: '0 3px 12px rgba(28, 36, 48, 0.035)', minWidth: '0' };
   return {
     renderIdentity({ me, devices, sessions } = {}) {
       // 호출마다 새 요소를 반환합니다. 이전 입력이나 DOM을 보관하지 않습니다.
@@ -11,7 +32,7 @@ export function createStudentView({ api } = {}) {
       root.style.fontSize = '1rem';
       root.style.lineHeight = '1.65';
       const text = (parent, tag, value) => {
-        const element = document.createElement(tag);
+        const element = polish(document.createElement(tag), tag);
         element.textContent = value;
         if (tag === 'h3') element.style.fontSize = '1.2rem';
         if (tag === 'h4') element.style.fontSize = '1.1rem';
@@ -64,6 +85,7 @@ export function createStudentView({ api } = {}) {
       text(overview, 'p', '전달받은 계정·기기·세션 조회 결과입니다. PC 악성코드 검사 결과가 아니며 AI 연결 점검과는 별개입니다.');
       const cards = text(overview, 'div', '');
       cards.classList.add('grid-2');
+      Object.assign(cards.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 11rem), 1fr))', gap: '0.8rem', alignItems: 'stretch' });
       const provenance = input => input?.mode === 'demo'
         ? '예시 자료 · 실제 조회 결과 아님 (demo)'
         : input?.mode === 'connected' ? '연동 자료 (connected)'
@@ -71,8 +93,10 @@ export function createStudentView({ api } = {}) {
       const card = (title, input, render) => {
         const panel = text(cards, 'section', '');
         panel.classList.add('card');
+        Object.assign(panel.style, panelStyle);
         text(panel, 'h4', title);
-        text(panel, 'p', provenance(input));
+        const source = text(panel, 'p', provenance(input));
+        Object.assign(source.style, { padding: '0.4rem 0.55rem', border: '1px solid #dce2ef', borderRadius: '7px', background: '#f1f4fa', fontSize: '0.875rem' });
         if (input?.status === 'loading') text(panel, 'p', '불러오는 중');
         else if (input?.status === 'error') text(panel, 'p', `조회 실패 · 확인 불가: ${value(input.error?.message)}`);
         else if (input?.status === 'ok') render(panel, input.data);
@@ -88,17 +112,23 @@ export function createStudentView({ api } = {}) {
       card('현재 세션', me, (panel, data) => {
         text(panel, 'p', sessionLine(data?.session));
       });
-      const connectionCard = text(cards, 'section', '');
+      // 자료 연결은 세 요약 카드 아래 전체 너비를 사용합니다.
+      const connectionCard = text(overview, 'section', '');
       connectionCard.classList.add('card');
+      Object.assign(connectionCard.style, { ...panelStyle, marginBlockStart: '0.8rem' });
       text(connectionCard, 'h4', '계정·기기·세션 자료 연결');
+      const connectionRows = text(connectionCard, 'div', '');
+      Object.assign(connectionRows.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 11rem), 1fr))', gap: '0.8rem' });
       for (const [name, input] of [['계정', me], ['기기 목록', devices], ['현재 세션 목록', sessions]]) {
         const state = input?.status === 'loading' ? '불러오는 중'
           : input?.status === 'error' ? '조회 실패'
           : input?.status === 'ok' ? '응답 수신' : '확인 불가';
-        text(connectionCard, 'p', `${name}: ${state} · ${provenance(input)}`);
+        const row = text(connectionRows, 'p', `${name}: ${state} · ${provenance(input)}`);
+        Object.assign(row.style, { margin: '0', padding: '0.7rem', border: '1px solid #dce2ef', borderRadius: '8px', background: '#f1f4fa' });
       }
       text(connectionCard, 'p', '연결 실패 시 위쪽 「다시 불러오기」 버튼으로 직접 재시도하세요. AI 연결 여부는 AI 연결 점검 영역에서 확인하세요.');
       const priorities = text(root, 'section', '');
+      Object.assign(priorities.style, { ...panelStyle, marginBlock: '1rem', background: '#f1f4fa' });
       text(priorities, 'h3', '핵심 기능 안내');
       text(priorities, 'p', '① 내 PC 상태: 제공 「내 PC 확인」에서 실측값·단위·시각 확인');
       text(priorities, 'p', '② 보안 기록: 보안 기록 메뉴에서 학생 날짜별 추이·목록·기록 다시 조회');
@@ -183,7 +213,7 @@ export function createStudentView({ api } = {}) {
       const root = document.createElement('div');
       root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
-        const node = document.createElement(tag);
+        const node = polish(document.createElement(tag), tag);
         node.textContent = content;
         parent.appendChild(node);
         return node;
@@ -206,6 +236,7 @@ export function createStudentView({ api } = {}) {
       }
       if (status === 'error') {
         root.setAttribute('role', 'alert');
+        Object.assign(root.style, { ...panelStyle, borderInlineStart: '4px solid #b42318' });
         text(root, 'h3', '보안 기록 조회 실패');
         text(root, 'p', `실패한 항목: 보안 기록 · 코드: ${value(error?.code)}`);
         text(root, 'p', `이유: ${value(error?.message)}`);
@@ -243,12 +274,14 @@ export function createStudentView({ api } = {}) {
       filters.style.flexWrap = 'wrap';
       filters.style.gap = '0.75rem';
       filters.style.marginBlock = '1rem';
+      Object.assign(filters.style, { padding: '0.85rem', borderRadius: '12px', background: '#f1f4fa', alignItems: 'end' });
       const makeFilter = (name, values, labelFor) => {
         const label = text(filters, 'label', name);
-        const select = document.createElement('select');
+        const select = polish(document.createElement('select'), 'select');
+        Object.assign(label.style, { display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '0', flex: '1 1 9rem', fontWeight: '600' });
         select.setAttribute('aria-label', name);
         select.style.fontSize = '1rem';
-        select.style.marginInlineStart = '0.4rem';
+        select.style.marginInlineStart = '0';
         // label로 감싼 네이티브 선택 상자는 키보드로 조작할 수 있습니다.
         label.appendChild(select);
         const add = (raw, caption) => {
@@ -320,11 +353,13 @@ export function createStudentView({ api } = {}) {
       };
       const count = text(root, 'p', '');
       const list = text(root, 'ul', '');
+      Object.assign(list.style, { listStyle: 'none', padding: '0', display: 'grid', gap: '0.8rem' });
       const detail = text(root, 'div', '');
       const showDetail = event => {
         detail.replaceChildren();
         const panel = text(detail, 'section', '');
         panel.setAttribute('data-student-event-detail', event.id);
+        Object.assign(panel.style, { ...panelStyle, marginBlock: '1rem' });
         text(panel, 'h3', `${value(event.id)} 상세`);
         text(panel, 'p', `사건 ID: ${value(event.id)} · 업무 앱: ${appLabel(event.appId)}`);
         const entries = (heading, rows) => {
@@ -367,6 +402,7 @@ export function createStudentView({ api } = {}) {
         for (const event of shown) {
           const row = text(list, 'li', '');
           row.setAttribute('data-student-event-id', event.id);
+          Object.assign(row.style, panelStyle);
           text(row, 'p', `사건 ID: ${value(event.id)} · 시각: ${value(event.at)}`);
           text(row, 'p', `종류: ${kindLabel(event.kind)} · 업무 앱: ${appLabel(event.appId)}`);
           text(row, 'p', `요약: ${value(event.summary)}`);
@@ -383,7 +419,7 @@ export function createStudentView({ api } = {}) {
       root.style.fontSize = '1rem';
       root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
-        const node = document.createElement(tag);
+        const node = polish(document.createElement(tag), tag);
         node.textContent = content;
         parent.appendChild(node);
         return node;
@@ -394,10 +430,13 @@ export function createStudentView({ api } = {}) {
       button.type = 'button';
       button.style.fontSize = '1rem';
       button.style.padding = '0.6rem 1rem';
+      Object.assign(button.style, { background: 'var(--accent, #4f46a5)', color: '#ffffff', borderColor: 'var(--accent, #4f46a5)' });
       const notice = text(root, 'p', '');
+      Object.assign(notice.style, { padding: '0.75rem', marginBlock: '0.8rem', borderRadius: '10px', background: '#f1f4fa', border: '1px solid #dce2ef' });
       notice.setAttribute('role', 'status');
       notice.setAttribute('aria-live', 'polite');
       const resultTime = text(root, 'p', '응답 시각: 확인 불가 · 최초 제공 입력에는 시각이 전달되지 않습니다.');
+      resultTime.style.fontVariantNumeric = 'tabular-nums';
       const content = text(root, 'div', '');
       const available = typeof api?.get === 'function';
       const mount = {
@@ -498,7 +537,8 @@ export function createStudentView({ api } = {}) {
       root.style.fontSize = '1rem';
       root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
-        const node = document.createElement(tag);
+        const node = polish(document.createElement(tag), tag);
+        if (tag === 'section') Object.assign(node.style, { ...panelStyle, marginBlock: '1rem' });
         node.textContent = content;
         if (tag === 'h3') node.style.fontSize = '1.2rem';
         parent.appendChild(node);

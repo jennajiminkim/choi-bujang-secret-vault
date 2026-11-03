@@ -1,5 +1,10 @@
 {
   "schema": "alekov.student-appearance.v1",
   "appName": "nævis",
-  "dashboardPreset": "student-first"
+  "dashboardPreset": "student-first",
+  "palette": {
+    "accent": "#4f46a5",
+    "background": "#f3f5fa",
+    "surface": "#ffffff"
+  }
 }
