@@ -1,13 +1,20 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
-export function createStudentView() {
+export function createStudentView({ api } = {}) {
+  // 학생 기록 재조회는 한 번에 하나만 실행합니다. 제공 화면의 새 입력은 이전 결과보다 우선합니다.
+  let eventQueryPending = false;
+  let eventMount = null;
   return {
     renderIdentity({ me, devices, sessions } = {}) {
       // 호출마다 새 요소를 반환합니다. 이전 입력이나 DOM을 보관하지 않습니다.
       const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, value) => {
         const element = document.createElement(tag);
         element.textContent = value;
+        if (tag === 'h3') element.style.fontSize = '1.2rem';
+        if (tag === 'h4') element.style.fontSize = '1.1rem';
         parent.appendChild(element);
         return element;
       };
@@ -33,7 +40,7 @@ export function createStudentView() {
       const sessionLine = session =>
         `세션 ID: ${value(session?.id)} · 상태: ${sessionState(session?.status)}`;
       const section = (title, input, renderData) => {
-        const container = text(root, 'section', '');
+        const container = text(identityDetails, 'section', '');
         text(container, 'h3', title);
         switch (input?.mode) {
           case 'connected': break;
@@ -91,6 +98,13 @@ export function createStudentView() {
         text(connectionCard, 'p', `${name}: ${state} · ${provenance(input)}`);
       }
       text(connectionCard, 'p', '연결 실패 시 위쪽 「다시 불러오기」 버튼으로 직접 재시도하세요. AI 연결 여부는 AI 연결 점검 영역에서 확인하세요.');
+      const priorities = text(root, 'section', '');
+      text(priorities, 'h3', '핵심 기능 안내');
+      text(priorities, 'p', '① 내 PC 상태: 제공 「내 PC 확인」에서 실측값·단위·시각 확인');
+      text(priorities, 'p', '② 보안 기록: 보안 기록 메뉴에서 학생 날짜별 추이·목록·기록 다시 조회');
+      text(priorities, 'p', '③ 자료 연결 확인: 학생 상태·알림 영역에서 SDP 진단·실패 항목·다음 행동 확인');
+      const identityDetails = text(root, 'details', '');
+      text(identityDetails, 'summary', '계정·기기·세션 상세 펼치기');
       section('현재 계정·기기·세션', me, (container, data) => {
         text(container, 'p', `사용자 이름: ${value(data?.user?.label)}`);
         text(container, 'p', `사용자 ID: ${value(data?.user?.id)}`);
@@ -163,9 +177,11 @@ export function createStudentView() {
       }
       return root;
     },
-    renderEvents({ status, mode, data, error } = {}) {
+    renderEvents(input = {}) {
+      const renderRecords = ({ status, mode, data, error } = {}) => {
       // 입력마다 새 DOM과 선택 상태를 만듭니다. 원본 목록은 변경하지 않습니다.
       const root = document.createElement('div');
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
         const node = document.createElement(tag);
         node.textContent = content;
@@ -189,8 +205,11 @@ export function createStudentView() {
         return root;
       }
       if (status === 'error') {
-        text(root, 'p', `기록을 불러오지 못했습니다: ${value(error?.message)}`);
-        text(root, 'p', '기록 추이: 조회 불가. 조회 실패는 기록 0건을 뜻하지 않습니다. 위쪽 「다시 불러오기」 버튼을 직접 누르세요.');
+        root.setAttribute('role', 'alert');
+        text(root, 'h3', '보안 기록 조회 실패');
+        text(root, 'p', `실패한 항목: 보안 기록 · 코드: ${value(error?.code)}`);
+        text(root, 'p', `이유: ${value(error?.message)}`);
+        text(root, 'p', '기록 추이: 조회 불가. 조회 실패는 기록 0건을 뜻하지 않습니다. 로컬 서버 실행 상태를 확인한 뒤 「기록 다시 조회」를 누르세요. 제공 화면 전체는 위쪽 「다시 불러오기」로 갱신합니다.');
         if (error?.code === 'CONTRACT_MISMATCH') {
           text(root, 'p', '확인 불가: 기록 응답 형식이 입력 계약과 일치하지 않습니다.');
         }
@@ -220,10 +239,16 @@ export function createStudentView() {
       const deviceLabel = state => state === 'compliant' ? '보안 기준 충족 (compliant)'
         : state === 'noncompliant' ? '보안 기준 미충족 (noncompliant)' : '확인 불가(unknown)';
       const filters = text(root, 'div', '');
+      filters.style.display = 'flex';
+      filters.style.flexWrap = 'wrap';
+      filters.style.gap = '0.75rem';
+      filters.style.marginBlock = '1rem';
       const makeFilter = (name, values, labelFor) => {
         const label = text(filters, 'label', name);
         const select = document.createElement('select');
         select.setAttribute('aria-label', name);
+        select.style.fontSize = '1rem';
+        select.style.marginInlineStart = '0.4rem';
         // label로 감싼 네이티브 선택 상자는 키보드로 조작할 수 있습니다.
         label.appendChild(select);
         const add = (raw, caption) => {
@@ -245,6 +270,7 @@ export function createStudentView() {
       text(trend, 'h3', '받은 기록의 날짜별 추이');
       text(trend, 'p', '현재 필터에 해당하는 받은 기록만 한국 시각(Asia/Seoul) 날짜로 집계합니다. 최근 최대 40건의 일부 이력이며, 기록이 없는 날짜를 0건으로 채우지 않습니다.');
       const trendBody = text(trend, 'div', '');
+      trendBody.style.overflowX = 'auto';
       const dateKey = at => {
         if (typeof at !== 'string' || !Number.isFinite(Date.parse(at))) return null;
         const parts = new Intl.DateTimeFormat('en-US', {
@@ -352,13 +378,129 @@ export function createStudentView() {
       for (const select of [kindFilter, appFilter, accessFilter]) select.addEventListener('change', draw);
       draw();
       return root;
+      };
+      const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
+      const text = (parent, tag, content) => {
+        const node = document.createElement(tag);
+        node.textContent = content;
+        parent.appendChild(node);
+        return node;
+      };
+      text(root, 'h3', '기록 추이와 목록').style.fontSize = '1.2rem';
+      text(root, 'p', '학생 작성 추이·필터·상세입니다. 재조회는 이 학생 기록 영역만 갱신하며 제공 화면·PC 실측·SDP 도움정보는 갱신하지 않습니다.');
+      const button = text(root, 'button', '기록 다시 조회');
+      button.type = 'button';
+      button.style.fontSize = '1rem';
+      button.style.padding = '0.6rem 1rem';
+      const notice = text(root, 'p', '');
+      notice.setAttribute('role', 'status');
+      notice.setAttribute('aria-live', 'polite');
+      const resultTime = text(root, 'p', '응답 시각: 확인 불가 · 최초 제공 입력에는 시각이 전달되지 않습니다.');
+      const content = text(root, 'div', '');
+      const available = typeof api?.get === 'function';
+      const mount = {
+        reset() {
+          button.setAttribute('aria-disabled', String(!available));
+          root.setAttribute('aria-busy', 'false');
+          notice.textContent = available ? '자동 조회하지 않습니다. 버튼을 누르면 받은 기록을 새로 조회하고 필터·상세를 초기화합니다.'
+            : '학생 재조회 API를 사용할 수 없습니다. 위쪽 제공 「다시 불러오기」를 사용하세요.';
+        },
+      };
+      eventMount = mount;
+      content.appendChild(renderRecords(input));
+      mount.reset();
+      if (eventQueryPending) {
+        button.setAttribute('aria-disabled', 'true');
+        notice.textContent = '이전 학생 기록 요청 정리 중… 현재 제공 입력을 우선 표시합니다.';
+      }
+      // 네이티브 버튼을 DOM에 유지하고 aria-disabled와 실행 가드로 중복 요청을 막습니다.
+      // Tab으로 다른 곳에 이동한 사용자의 초점을 완료 시 강제로 옮기지 않습니다.
+      const safe = value => typeof value === 'string' && value.length > 0 && value.length <= 2000
+        && !/(?:Bearer\s+\S+|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:password|access_token|api[_ -]?key)\s*[:=])/i.test(value) ? value : '확인 불가';
+      const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+      const isId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value);
+      const isText = value => typeof value === 'string' && value.length <= 2000;
+      const textRow = row => isRecord(row) && isId(row.id) && isText(row.text);
+      const validEvents = rows => Array.isArray(rows) && rows.length <= 40
+        && rows.every(row => isRecord(row) && isId(row.id)
+          && ['access', 'xdr'].includes(row.kind) && typeof row.at === 'string' && Number.isFinite(Date.parse(row.at))
+          && isText(row.summary) && (row.appId == null || isId(row.appId))
+          && Array.isArray(row.evidence) && row.evidence.every(textRow)
+          && Array.isArray(row.rules) && row.rules.every(textRow)
+          && isRecord(row.state) && ['allowed', 'denied', 'unknown'].includes(row.state.access)
+          && ['active', 'expired', 'revoked', 'unknown'].includes(row.state.session)
+          && ['compliant', 'noncompliant', 'unknown'].includes(row.state.device)
+          && Array.isArray(row.supportedActions) && row.supportedActions.every(isId))
+        && new Set(rows.map(row => row.id)).size === rows.length;
+      const validCoverage = (coverage, rows, requestedAt, receivedAt) => {
+        const fields = ['schema', 'kind', 'scope', 'limit', 'total', 'returned', 'truncated', 'observedAtMs'];
+        return isRecord(coverage) && Object.keys(coverage).length === fields.length
+          && fields.every(field => Object.hasOwn(coverage, field))
+          && coverage.schema === 'alekov.sdp.coverage.v1' && coverage.kind === 'events'
+          && coverage.scope === 'own-recorded-events' && coverage.limit === 40
+          && Number.isSafeInteger(coverage.total) && Number.isSafeInteger(coverage.returned)
+          && coverage.returned === rows.length && coverage.total >= coverage.returned
+          && typeof coverage.truncated === 'boolean' && coverage.truncated === (coverage.total > coverage.returned)
+          && Number.isSafeInteger(coverage.observedAtMs) && coverage.observedAtMs > 0
+          && coverage.observedAtMs >= requestedAt - 5000 && coverage.observedAtMs <= receivedAt + 5000
+          && receivedAt - coverage.observedAtMs <= 20000;
+      };
+      button.addEventListener('click', async () => {
+        if (!available || eventQueryPending || eventMount !== mount) return;
+        eventQueryPending = true;
+        button.setAttribute('aria-disabled', 'true');
+        root.setAttribute('aria-busy', 'true');
+        notice.textContent = '기록 조회 중… 잠시 기다려 주세요.';
+        resultTime.textContent = '이번 응답 시각: 확인 불가 · 조회 중';
+        content.replaceChildren(renderRecords({ status: 'loading', mode: 'unknown' }));
+        let outcome;
+        const requestedAt = Date.now();
+        try {
+          const response = await api.get('/api/events');
+          const receivedAt = Date.now();
+          if (eventMount !== mount) return;
+          const mode = ['connected', 'demo', 'disconnected'].includes(response?.meta?.mode) ? response.meta.mode : 'unknown';
+          if (response?.ok === false) {
+            outcome = { status: 'error', mode, error: { code: safe(response.error?.code), message: safe(response.error?.message) } };
+          } else if (response?.ok !== true || !validEvents(response.data) || mode === 'unknown'
+            || (Object.hasOwn(response, 'coverage') && !validCoverage(response.coverage, response.data, requestedAt, receivedAt))) {
+            outcome = { status: 'error', mode: 'unknown', error: { code: 'CONTRACT_MISMATCH', message: '기록 응답 형식 또는 조회 범위를 확인할 수 없습니다.' } };
+          } else {
+            outcome = { status: 'ok', mode, data: response.data };
+          }
+          const at = response?.meta?.checkedAt;
+          const validTime = typeof at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(at) && Number.isFinite(Date.parse(at));
+          resultTime.textContent = validTime ? `이번 응답 시각(checkedAt): ${at} · 기록 발생 시각이나 PC 측정 시각이 아닙니다.`
+            : '이번 응답 시각: 확인 불가 · 유효한 시각이 전달되지 않았습니다.';
+        } catch {
+          if (eventMount !== mount) return;
+          outcome = { status: 'error', mode: 'unknown', error: { code: 'STUDENT_QUERY_FAILED', message: '학생 기록 요청을 완료하지 못했습니다. 로컬 서버 실행 상태를 확인하세요.' } };
+          resultTime.textContent = '이번 응답 시각: 확인 불가 · 요청을 완료하지 못했습니다.';
+        } finally {
+          eventQueryPending = false;
+          if (eventMount === mount) {
+            mount.reset();
+            content.replaceChildren(renderRecords(outcome));
+            notice.textContent = outcome?.status === 'ok' ? '기록 응답을 받아 학생 추이·목록을 갱신했습니다. 실제 시스템 연결 여부는 자료 출처 표시와 구분하세요.'
+              : '보안 기록 조회 실패 · 아래 실패 항목과 다음 행동을 확인하세요.';
+          } else {
+            eventMount?.reset();
+          }
+        }
+      });
+      return root;
     },
     renderStatus({ devices, sessions, notifications, diagnostics, mode } = {}) {
       // 매 입력마다 새 화면을 만들며 이전 목록·오류·도움정보는 보관하지 않습니다.
       const root = document.createElement('div');
+      root.style.fontSize = '1rem';
+      root.style.lineHeight = '1.65';
       const text = (parent, tag, content) => {
         const node = document.createElement(tag);
         node.textContent = content;
+        if (tag === 'h3') node.style.fontSize = '1.2rem';
         parent.appendChild(node);
         return node;
       };
@@ -478,6 +620,9 @@ export function createStudentView() {
         text(recovery, 'p', '자료별 현재 상태는 아래에 표시합니다. 최신 값이 필요하면 위쪽 「다시 불러오기」 버튼을 직접 누르세요.');
       }
 
+      // 연결 상태와 실패·다음 행동을 설명 패널보다 먼저 표시합니다.
+      root.insertBefore(sdp, pcGuide);
+      root.insertBefore(recovery, pcGuide);
       const collection = (title, input, empty, renderRow) => {
         const section = text(root, 'section', '');
         text(section, 'h3', title);
